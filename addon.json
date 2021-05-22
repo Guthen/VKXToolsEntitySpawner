@@ -1,0 +1,12 @@
+{
+  "title": "VKXTools ─ Entity Spawner",
+  "type": "tool",
+  "tags": [
+    "roleplay",
+    "fun"
+  ],
+  "ignore": [
+    ".gman/*",
+    "vkx_entspawner.jpg"
+  ]
+}
