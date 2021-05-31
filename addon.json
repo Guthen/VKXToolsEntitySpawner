@@ -7,6 +7,9 @@
   ],
   "ignore": [
     ".gman/*",
-    "vkx_entspawner.jpg"
+    "vkx_entspawner.jpg",
+    ".git/*",
+    ".gitignore",
+    "*.md"
   ]
 }
