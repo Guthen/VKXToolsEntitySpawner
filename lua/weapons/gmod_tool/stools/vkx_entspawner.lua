@@ -6,7 +6,7 @@ TOOL.model = "models/editor/playerstart.mdl"
 function TOOL:LeftClick( tr )
     if SERVER then return true end
 
-    if not #self.ghost_entities or #self.ghost_entities == 0 then return false end
+    if not self.ghost_entities or #self.ghost_entities == 0 then return false end
     if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then return false end
 
     local locations = {}
