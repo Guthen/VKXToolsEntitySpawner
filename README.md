@@ -2,6 +2,8 @@
 ---
 ![Logo](vkx_entspawner.jpg)
 
+Available on [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2547807575)
+
 ## 📃 Description
 This is a tool made for **Garry's Mod** in order to *spawn random choosen entities* in a *specific shape* with or without a *spawner*.
 
@@ -24,6 +26,8 @@ It allows you to spawn a lot of entities, see the following list of *compatibles
 
 ### 🤖 Spawners
 **Spawners** are used to spawn *random choosen* entities at a fixed *delay* and a fixed *maximum of entities*. They can be *permanently saved* on the map or just *temporary*. They are usefull to spawn groups of NPCs (like zombies) or to spawn *vehicles* or *weapons* periodically for an apocalypse server for example.
+
+Green spawners are non-permanent spawners and red spawners are permanent (saved and loaded on server restart) ones.
 
 ### ❗ Known Issues
 #### *"It do nothing when I left click"*
