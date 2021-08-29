@@ -337,16 +337,17 @@ else
     end )
 
     --  spawner time
-    local fake_player = {
-        UniqueID = function() return 404 end,
-    }
+    local fake_cleanup_id = -1
     timer.Create( "vkx_entspawner:spawner", 1, 0, function()
         if player.GetCount() <= 0 then return end
 
         for i, spawner in pairs( vkx_entspawner.spawners ) do
             if CurTime() - spawner.last_time >= spawner.delay then
                 vkx_entspawner.run_spawner( spawner, function( obj, type )
-                    cleanup.Add( fake_player, type, obj )
+                    local list = cleanup.GetList()
+                    list[fake_cleanup_id] = list[fake_cleanup_id] or {}
+                    list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
+                    list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
                 end )
                 spawner.last_time = CurTime()
             end
