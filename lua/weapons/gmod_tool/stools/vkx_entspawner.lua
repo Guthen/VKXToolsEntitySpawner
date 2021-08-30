@@ -7,7 +7,10 @@ function TOOL:LeftClick( tr )
     if SERVER then return true end
 
     if not self.ghost_entities or #self.ghost_entities == 0 then return false end
-    if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then return false end
+    if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then 
+        notification.AddLegacy( "You must have selected entities to spawn!", NOTIFY_ERROR, 3 )
+        return true
+    end
 
     local locations = {}
     for i, v in ipairs( self.ghost_entities ) do
@@ -28,6 +31,7 @@ function TOOL:LeftClick( tr )
             net.WriteUInt( self:GetClientNumber( "spawner_delay", 3 ), 10 )
         end
     net.SendToServer()
+
     return true
 end
 
@@ -52,13 +56,17 @@ if SERVER then
     local last_times = {}
     net.Receive( "vkx_entspawner:spawn", function( len, ply )
         if not ply:IsSuperAdmin() then return ply:ChatPrint( "This tool is reserved for SuperAdmin only!" ) end
-        if last_times[ply] and CurTime() - last_times[ply] <= .1 then return end --  avoid unwanted spam
+        if last_times[ply] and CurTime() - last_times[ply] <= .1 then return vkx_entspawner.debug_print( "%q is spamming, aborting request", ply:GetName() ) end --  avoid unwanted spam
         
         local locations = net.ReadTable()
-        if not locations or #locations == 0 then return end
+        if not locations or #locations == 0 then 
+            return vkx_entspawner.debug_print( "%q didn't send locations", ply:GetName() ) 
+        end
 
         local chances = net.ReadTable()
-        if not chances or #chances == 0 then return end
+        if not chances or #chances == 0 then 
+            return vkx_entspawner.debug_print( "%q didn't send chances", ply:GetName() ) 
+        end
 
         local is_spawner, is_perma, spawner_max, spawner_delay = net.ReadBool()
         if is_spawner then
@@ -76,6 +84,9 @@ if SERVER then
                 undo.Finish()
             end
         else
+            local messages = {}
+
+            --  spawning
             undo.Create( "Entities Groups" )
             vkx_entspawner.run_spawner( {
                 locations = locations,
@@ -84,9 +95,19 @@ if SERVER then
             }, function( obj, type )
                 cleanup.Add( ply, type, obj )
                 undo.AddEntity( obj )
+            end, function( err, obj, blocked_entity )
+                if err == "cant_spawn" then
+                    local msg = ( "%q is preventing %q from spawning" ):format( blocked_entity:GetClass(), obj:GetClass() )
+                    messages[msg] = ( messages[msg] or 0 ) + 1
+                end
             end )
             undo.SetPlayer( ply )
             undo.Finish()
+
+            --  notification
+            for msg, count in pairs( messages ) do
+                vkx_entspawner.notify( ply, msg .. " (x" .. count .. ")", 1 )
+            end
         end
 
         last_times[ply] = CurTime()

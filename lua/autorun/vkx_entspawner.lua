@@ -1,7 +1,9 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.1.1"
+vkx_entspawner.version = "2.1.2"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
+vkx_entspawner.blocking_entity_blacklist = {}
+
 
 function vkx_entspawner.print( msg, ... )
     if #{ ... } > 0 then
@@ -9,6 +11,12 @@ function vkx_entspawner.print( msg, ... )
     else
         print( "VKX Entity Spawner ─ " .. msg )
     end
+end
+
+local convar_debug = CreateConVar( "vkx_entspawner_debug", "0" )
+function vkx_entspawner.debug_print( msg, ... )
+    if not convar_debug:GetBool() then return end
+    vkx_entspawner.print( "Debug: " .. msg, ... )
 end
 
 if CLIENT then
@@ -47,6 +55,11 @@ if CLIENT then
     hook.Add( "InitPostEntity", "vkx_entspawner:network", function()
         net.Start( "vkx_entspawner:network" )
         net.SendToServer()
+    end )
+
+    --  notification
+    net.Receive( "vkx_entspawner:notify", function()
+        notification.AddLegacy( net.ReadString(), net.ReadUInt( 3 ), 3 )
     end )
 else
     function vkx_entspawner.spawn_object( key, pos, ang )
@@ -162,8 +175,9 @@ else
         local pos = ent:GetPos()
         local min, max = ent:GetModelBounds()
         for i, v in ipairs( ents.FindInBox( pos + min, pos + max ) ) do
-            if not ( v == ent ) and not v:IsWeapon()--[[ and ( v:IsPlayer() or v:IsVehicle() or v:GetClass() == "prop_physics" ) ]] then 
-                return false
+            if not ( v == ent ) and not vkx_entspawner.blocking_entity_blacklist[v:GetClass()] and v:GetBrushPlaneCount() == 0 and not v:IsWeapon() then 
+                vkx_entspawner.debug_print( "%q is blocking %q from spawning", tostring( v ), tostring( ent ) )    
+                return false, v
             end
         end
 
@@ -255,7 +269,7 @@ else
         vkx_entspawner.safe_network_spawners()
     end
 
-    function vkx_entspawner.run_spawner( spawner, callback )
+    function vkx_entspawner.run_spawner( spawner, callback, err_callback )
         for i, v in ipairs( spawner.locations ) do
             --  limit?
             v.entities = v.entities or {}
@@ -271,7 +285,9 @@ else
                     if math.random() <= chance.percent / 100 then 
                         local obj, type = vkx_entspawner.spawn_object( chance.key, v.pos, v.ang )
                         if IsValid( obj ) then
-                            if not vkx_entspawner.can_spawn_safely( obj ) then
+                            local can_spawn, blocking_entity = vkx_entspawner.can_spawn_safely( obj )
+                            if not can_spawn then
+                                if err_callback then err_callback( "cant_spawn", obj, blocking_entity ) end
                                 obj:Remove()
                                 break
                             end
@@ -353,6 +369,15 @@ else
             end
         end
     end )
+
+    --  notification
+    util.AddNetworkString( "vkx_entspawner:notify" )
+    function vkx_entspawner.notify( ply, msg, type )
+        net.Start( "vkx_entspawner:notify" )
+            net.WriteString( msg )
+            net.WriteUInt( type, 3 )
+        net.Send( ply )
+    end
 end
 
 
