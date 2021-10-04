@@ -29,6 +29,8 @@ function TOOL:LeftClick( tr )
             net.WriteBool( tobool( self:GetClientNumber( "is_perma", 0 ) ) )
             net.WriteUInt( self:GetClientNumber( "spawner_max", 1 ), 8 )
             net.WriteUInt( self:GetClientNumber( "spawner_delay", 3 ), 10 )
+            net.WriteUInt( self:GetClientNumber( "spawner_radius", 0 ), 16 )
+            net.WriteBool( self:GetClientNumber( "spawner_radius_disappear", 0 ) )
         end
     net.SendToServer()
 
@@ -68,13 +70,15 @@ if SERVER then
             return vkx_entspawner.debug_print( "%q didn't send chances", ply:GetName() ) 
         end
 
-        local is_spawner, is_perma, spawner_max, spawner_delay = net.ReadBool()
+        local is_spawner, is_perma, spawner_max, spawner_delay, spawner_radius, spawner_radius_disappear = net.ReadBool()
         if is_spawner then
             is_perma = net.ReadBool()
             spawner_max = net.ReadUInt( 8 )
             spawner_delay = net.ReadUInt( 10 )
+            spawner_radius = net.ReadUInt( 16 )
+            spawner_radius_disappear = net.ReadBool()
 
-            local id = vkx_entspawner.new_spawners( locations, chances, spawner_max, spawner_delay, is_perma )
+            local id = vkx_entspawner.new_spawners( locations, chances, spawner_max, spawner_delay, is_perma, spawner_radius, spawner_radius_disappear )
             if not is_perma then 
                 undo.Create( "Entities Spawners" )
                 undo.AddFunction( function()
@@ -223,13 +227,32 @@ elseif CLIENT then
     hook.Add( "PostDrawTranslucentRenderables", "vkx_entspawner:spawners", function()
         if not vkx_entspawner.is_holding_tool() then return end
 
-        --  spawners
-        for i, locations in ipairs( vkx_entspawner.spawners ) do
-            for i, v in ipairs( locations ) do
-                local color = locations.perma and perma_color or non_perma_color
+        for i, spawner in ipairs( vkx_entspawner.spawners ) do
+            --  spawners
+            for i, v in ipairs( spawner.locations ) do
+                local color = spawner.perma and perma_color or non_perma_color
                 render.DrawWireframeSphere( v.pos, min_dist, 6, 6, color, false )
                 render.DrawLine( v.pos, v.pos + v.ang:Forward() * min_dist * 1.5, color, false )
             end
+            
+            --  player radius
+            if ( spawner.radius or 0 ) > 0 then
+                render.DrawWireframeSphere( vkx_entspawner.get_spawner_center( spawner ), spawner.radius, 6, 6, spawner.radius_disappear and perma_color or non_perma_color, true )
+            end
+        end
+
+        --  radius preview
+        local tool = vkx_entspawner.get_tool()
+        local radius, radius_disappear = tool:GetClientNumber( "spawner_radius", 0 ), tool:GetClientInfo( "spawner_radius_disappear" ) == "1"
+        if radius > 0 then
+            local locations = {}
+            for i, ent in ipairs( tool.ghost_entities ) do
+                locations[i] = {
+                    pos = ent:GetPos()
+                }
+            end
+
+            render.DrawWireframeSphere( vkx_entspawner.get_spawner_center( { locations = locations } ), radius, 6, 6, radius_disappear and perma_color or non_perma_color, true )
         end
     end )
 
@@ -238,14 +261,14 @@ elseif CLIENT then
 
         --  spawners
         local tr_pos = LocalPlayer():GetEyeTrace().HitPos
-        for i, locations in ipairs( vkx_entspawner.spawners ) do
-            for i, v in ipairs( locations ) do
+        for i, spawner in ipairs( vkx_entspawner.spawners ) do
+            for i, v in ipairs( spawner.locations ) do
                 if tr_pos:DistToSqr( v.pos ) <= min_dist_sqr then
-                    local color = locations.perma and perma_color or non_perma_color
+                    local color = spawner.perma and perma_color or non_perma_color
                     local pos = v.pos:ToScreen()
                     
-                    draw.SimpleText( locations.delay .. "s ─ " .. locations.max .. " max", "Default", pos.x, pos.y, color )
-                    for i, ent in ipairs( locations.entities ) do
+                    draw.SimpleText( spawner.delay .. "s ─ " .. spawner.max .. " max", "Default", pos.x, pos.y, color )
+                    for i, ent in ipairs( spawner.entities ) do
                         draw.SimpleText( ent.key .. " (" .. ent.percent .. "%)", "Default", pos.x, pos.y + 15 * i, color )
                     end
                 end
@@ -416,28 +439,35 @@ elseif CLIENT then
         spawner_form:SetName( "Spawner" )
         panel:AddItem( spawner_form )
 
-        local spawner_check, perma_check, max_slider, delay_slider = spawner_form:CheckBox( "Is Spawner", "vkx_entspawner_is_spawner" )
+        local spawner_check, perma_check, max_slider, delay_slider, radius_slider = spawner_form:CheckBox( "Is Spawner", "vkx_entspawner_is_spawner" )
         spawner_form:ControlHelp( "If checked, this tool will creates Entities Spawners instead of direct Entities." )
         function spawner_check:OnChange( value )
-            perma_check:SetEnabled( value )
-            max_slider:SetEnabled( value )
-            delay_slider:SetEnabled( value )
+            for i, v in ipairs( spawner_form.Items ) do
+                v:SetEnabled( value )
+            end
         end
 
         --  perma
         perma_check = spawner_form:CheckBox( "Is Perma", "vkx_entspawner_is_perma" )
-        perma_check:SetEnabled( spawner_check:GetChecked() )
         spawner_form:ControlHelp( "If checked, the created Entities spawners will be saved and loaded on server start. Note that red sphere spawners represent perma spawners and green are non-perma spawners." )
     
         --  max
         max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", 1, 16, 0 )
-        max_slider:SetEnabled( spawner_check:GetChecked() )
         spawner_form:ControlHelp( "How many Entities can spawn for each spawner/location?" )
 
         --  delay
         delay_slider = spawner_form:NumSlider( "Spawn Delay", "vkx_entspawner_spawner_delay", 1, 120, 0 )
-        delay_slider:SetEnabled( spawner_check:GetChecked() )
         spawner_form:ControlHelp( "How many seconds should the spawner wait between each spawn?" )
+
+        --  radius
+        radius_slider = spawner_form:NumSlider( "Player Spawn Radius", "vkx_entspawner_spawner_radius", 0, 2 ^ 16 - 1, 0 )
+        spawner_form:ControlHelp( "If set above 0, the radius will define the area whenever the spawner will start to spawn entities depending of player presence. If a player is in the radius, the spawner will start spawning." )
+
+        --  radius disappear
+        radius_disappear_check = spawner_form:CheckBox( "Player Disappear Radius", "vkx_entspawner_spawner_radius_disappear" )
+        spawner_form:ControlHelp( "If checked, when no player is within the radius, spawned entities will automatically disappear." )
+
+        spawner_check:OnChange( spawner_check:GetChecked() )
     end
 end
 
@@ -457,6 +487,8 @@ add_convar( "is_spawner", "0" )
 add_convar( "is_perma", "0" )
 add_convar( "spawner_max", "1" )
 add_convar( "spawner_delay", "3" )
+add_convar( "spawner_radius", "0" )
+add_convar( "spawner_radius_disappear", "0" )
 
 for k, v in pairs( list.Get( "vkx_entspawner_shapes" ) ) do
     for cmd_k, cmd_v in pairs( v.convars or {} ) do

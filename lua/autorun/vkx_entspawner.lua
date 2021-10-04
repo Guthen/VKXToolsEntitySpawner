@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.1.3"
+vkx_entspawner.version = "2.2.0"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -21,6 +21,16 @@ function vkx_entspawner.debug_print( msg, ... )
     vkx_entspawner.print( "Debug: " .. msg, ... )
 end
 
+function vkx_entspawner.get_spawner_center( spawner )
+    local sum_pos = Vector()
+
+    for i, v in ipairs( spawner.locations ) do
+        sum_pos = sum_pos + v.pos
+    end
+
+    return sum_pos / #spawner.locations
+end
+
 if CLIENT then
     vkx_entspawner.ents_chance = vkx_entspawner.ents_chance or {}
 
@@ -33,17 +43,20 @@ if CLIENT then
         return true
     end
 
-    function vkx_entspawner.refresh_tool_preview()
+    function vkx_entspawner.get_tool()
         if not IsValid( LocalPlayer() ) then return end
-        local tool = LocalPlayer():GetTool( "vkx_entspawner" )
+        return LocalPlayer():GetTool( "vkx_entspawner" )
+    end
+
+    function vkx_entspawner.refresh_tool_preview()
+        local tool = vkx_entspawner.get_tool()
         if tool then
             tool:ComputeGhostEntities()
         end
     end
 
     function vkx_entspawner.delete_ghost_entities()
-        if not IsValid( LocalPlayer() ) then return end
-        local tool = LocalPlayer():GetTool( "vkx_entspawner" )
+        local tool = vkx_entspawner.get_tool()
         if tool then
             tool:ClearGhostEntities()
         end
@@ -235,7 +248,7 @@ else
     end
     hook.Add( "InitPostEntity", "vkx_entspawner:spawner", vkx_entspawner.load_perma_spawners )
 
-    function vkx_entspawner.new_spawners( locations, entities, max, delay, perma )
+    function vkx_entspawner.new_spawners( locations, entities, max, delay, perma, radius, radius_disappear )
         --  round percent
         for i, v in ipairs( entities ) do
             v.percent = math.Round( v.percent, 1 )
@@ -249,6 +262,8 @@ else
             last_time = CurTime(),
             delay = delay,
             perma = perma or nil,
+            radius = radius or 0,
+            radius_disappear = radius_disappear,
         }
 
         --  save
@@ -321,19 +336,22 @@ else
         --  serialize spawners
         local spawners = {}
         for i, spawner in pairs( vkx_entspawner.spawners ) do
-            local locations = {}
-            locations.perma = spawner.perma or nil
-            locations.entities = spawner.entities
-            locations.max = spawner.max
-            locations.delay = spawner.delay
+            local cl_spawner = {}
+            cl_spawner.perma = spawner.perma or nil
+            cl_spawner.entities = spawner.entities
+            cl_spawner.max = spawner.max
+            cl_spawner.delay = spawner.delay
+            cl_spawner.radius = spawner.radius
+            cl_spawner.radius_disappear = spawner.radius_disappear
+            cl_spawner.locations = {}
             for i, v in ipairs( spawner.locations ) do
                 --  avoid 'entities' table
-                locations[#locations + 1] = {
+                cl_spawner.locations[#cl_spawner.locations + 1] = {
                     pos = v.pos,
                     ang = v.ang
                 }
             end
-            spawners[#spawners + 1] = locations
+            spawners[#spawners + 1] = cl_spawner
         end
 
         --  send
@@ -361,13 +379,46 @@ else
 
         for i, spawner in pairs( vkx_entspawner.spawners ) do
             if CurTime() - spawner.last_time >= spawner.delay then
-                vkx_entspawner.run_spawner( spawner, function( obj, type )
-                    local list = cleanup.GetList()
-                    list[fake_cleanup_id] = list[fake_cleanup_id] or {}
-                    list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
-                    list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
-                end )
-                spawner.last_time = CurTime()
+                --  run spawner
+                local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
+                if not ( should_run == false ) then
+                    vkx_entspawner.run_spawner( spawner, function( obj, type )
+                        local list = cleanup.GetList()
+                        list[fake_cleanup_id] = list[fake_cleanup_id] or {}
+                        list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
+                        list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
+                    end )
+                    spawner.last_time = CurTime()
+                end
+            end
+        end
+    end )
+
+    hook.Add( "vkx_entspawner:should_spawner_run", "vkx_entspawner:player_radius", function( spawner )
+        --  player presence radius
+        if ( spawner.radius or 0 ) > 0 then
+            local has_someone_within = false
+            for i, ply in ipairs( player.GetAll() ) do
+                if ply:GetPos():Distance( vkx_entspawner.get_spawner_center( spawner ) ) <= spawner.radius then
+                    has_someone_within = true
+                    break
+                end
+            end
+
+            if not has_someone_within then
+                --  player presence disappear
+                if spawner.radius_disappear then
+                    for i, v in ipairs( spawner.locations ) do
+                        for i, ent in ipairs( v.entities ) do
+                            if IsValid( ent ) then
+                                ent:Remove()
+                            end
+                        end
+                        v.entities = {}
+                    end
+                end
+
+                return false
             end
         end
     end )
