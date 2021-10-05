@@ -3,6 +3,7 @@ TOOL.Name = "#tool.vkx_entspawner.name"
 
 TOOL.model = "models/editor/playerstart.mdl"
 
+local convars
 function TOOL:LeftClick( tr )
     if SERVER then return true end
 
@@ -278,6 +279,15 @@ elseif CLIENT then
 
     --  menu
     function TOOL.BuildCPanel( panel )
+        panel:AddControl( "ComboBox", {
+            MenuButton = 1,
+            Folder = "vkx_entspawner",
+            Options = {
+                ["#preset.default"] = convars,
+            },
+            CVars = table.GetKeys( convars ),
+        } )
+
         ---   shape
         local shape_form = vgui.Create( "DForm" )
         shape_form:SetName( "Shape" )
@@ -495,3 +505,5 @@ for k, v in pairs( list.Get( "vkx_entspawner_shapes" ) ) do
         add_convar( cmd_k, cmd_v )
     end
 end
+
+convars = TOOL:BuildConVarList()
