@@ -6,6 +6,7 @@ TOOL.model = "models/editor/playerstart.mdl"
 local convars
 function TOOL:LeftClick( tr )
     if SERVER then return true end
+    if not IsFirstTimePredicted() then return end
 
     if not self.ghost_entities or #self.ghost_entities == 0 then return false end
     if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then 
@@ -42,6 +43,7 @@ local min_dist = 32
 local min_dist_sqr = min_dist ^ 2
 function TOOL:RightClick( tr )
     if CLIENT then return true end
+    if not IsFirstTimePredicted() then return end
 
     for id, spawner in pairs( vkx_entspawner.spawners ) do
         for i, v in ipairs( spawner.locations ) do
