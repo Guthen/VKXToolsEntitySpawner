@@ -81,7 +81,7 @@ if SERVER then
             spawner_radius = net.ReadUInt( 16 )
             spawner_radius_disappear = net.ReadBool()
 
-            local id = vkx_entspawner.new_spawners( locations, chances, spawner_max, spawner_delay, is_perma, spawner_radius, spawner_radius_disappear )
+            local id = vkx_entspawner.new_spawner( locations, chances, spawner_max, spawner_delay, is_perma, spawner_radius, spawner_radius_disappear )
             if not is_perma then 
                 undo.Create( "Entities Spawners" )
                 undo.AddFunction( function()

@@ -250,7 +250,7 @@ else
     end
     hook.Add( "InitPostEntity", "vkx_entspawner:spawner", vkx_entspawner.load_perma_spawners )
 
-    function vkx_entspawner.new_spawners( locations, entities, max, delay, perma, radius, radius_disappear )
+    function vkx_entspawner.new_spawner( locations, entities, max, delay, perma, radius, radius_disappear )
         --  round percent
         for i, v in ipairs( entities ) do
             v.percent = math.Round( v.percent, 1 )
