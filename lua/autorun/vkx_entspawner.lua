@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.2.1"
+vkx_entspawner.version = "2.2.2"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -69,10 +69,13 @@ if CLIENT then
         local spawners = net.ReadTable()
         vkx_entspawner.spawners = spawners
     end )
-    hook.Add( "InitPostEntity", "vkx_entspawner:network", function()
+
+    local function retrieve_spawners()
         net.Start( "vkx_entspawner:network" )
         net.SendToServer()
-    end )
+    end
+    concommand.Add( "vkx_entspawner_retrieve_spawners", retrieve_spawners )
+    hook.Add( "InitPostEntity", "vkx_entspawner:network", retrieve_spawners )
 
     --  notification
     net.Receive( "vkx_entspawner:notify", function()
@@ -242,34 +245,58 @@ else
 
         --  add spawners
         for i, spawner in pairs( spawners ) do
-            spawner.last_time = CurTime()
             spawner.perma = true
-            vkx_entspawner.spawners[#vkx_entspawner.spawners + 1] = spawner
+            vkx_entspawner.new_spawner( spawner )
         end
         vkx_entspawner.print( "Load %d spawners!", #spawners )
     end
     hook.Add( "InitPostEntity", "vkx_entspawner:spawner", vkx_entspawner.load_perma_spawners )
+    concommand.Add( "vkx_entspawner_load_spawners", vkx_entspawner.load_perma_spawners )
 
-    function vkx_entspawner.new_spawner( locations, entities, max, delay, perma, radius, radius_disappear )
+    --[[ 
+        @function vkx_entspawner.new_spawner
+            | description: Register a new spawner, network it and save it if 'perma' is true
+            | params:
+                spawner: table Spawner to register
+                    | params:
+                        locations: table[@Location] List of locations (position and angles) where entities will spawn
+                        entities: table[@EntityChance] List of spawnable entities 
+                        max: int Number of maximum entities per location
+                        delay: float Time needed between each spawn
+                        perma: (optional) bool Is a Permanent Spawner, if so, the spawner will be saved
+                        radius: (optional) int Player Presence Radius, allow the spawner to run if a Player is in the radius 
+                        radius_disappear: (optional) bool In addition to PPR, will disappear spawned entities if no Player is in the radius
+        
+        @structure Location
+            | description: Represents a position and an angle
+            | params:
+                pos: Vector
+                ang: Angle
+        
+        @structure EntityChance
+            | description: Represents an entity class and his percent chance of getting it
+            | params:
+                key: string Entity Class Name
+                percent: float Entity Chance, from 0 to 100 
+    ]]
+    function vkx_entspawner.new_spawner( spawner )
         --  round percent
-        for i, v in ipairs( entities ) do
+        for i, v in ipairs( spawner.entities ) do
             v.percent = math.Round( v.percent, 1 )
         end
 
+        --  add 'entities' table to each location
+        for i, v in ipairs( spawner.locations ) do
+            v.entities = {}
+        end
+
         --  add spawner
-        vkx_entspawner.spawners[#vkx_entspawner.spawners + 1] = {
-            locations = locations,
-            entities = entities,
-            max = max, 
-            last_time = CurTime(),
-            delay = delay,
-            perma = perma or nil,
-            radius = radius or 0,
-            radius_disappear = radius_disappear,
-        }
+        spawner.last_time = spawner.last_time or CurTime()
+        spawner.radius = spawner.radius or 0
+        vkx_entspawner.spawners[#vkx_entspawner.spawners + 1] = spawner
 
         --  save
-        if perma then
+        if spawner.perma then
             vkx_entspawner.save_perma_spawners()
         end
 
@@ -291,7 +318,6 @@ else
     function vkx_entspawner.run_spawner( spawner, callback, err_callback )
         for i, v in ipairs( spawner.locations ) do
             --  limit?
-            v.entities = v.entities or {}
             for i, ent in ipairs( v.entities ) do
                 if not IsValid( ent ) then
                     table.remove( v.entities, i )

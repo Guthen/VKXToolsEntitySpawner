@@ -81,7 +81,15 @@ if SERVER then
             spawner_radius = net.ReadUInt( 16 )
             spawner_radius_disappear = net.ReadBool()
 
-            local id = vkx_entspawner.new_spawner( locations, chances, spawner_max, spawner_delay, is_perma, spawner_radius, spawner_radius_disappear )
+            local id = vkx_entspawner.new_spawner( {
+                locations = locations,
+                entities = chances,
+                max = spawner_max,
+                delay = spawner_delay,
+                perma = spawner_perma,
+                radius = spawner_radius,
+                radius_disappear = spawner_radius_disappear,
+            } )
             if not is_perma then 
                 undo.Create( "Entities Spawners" )
                 undo.AddFunction( function()
@@ -227,7 +235,8 @@ elseif CLIENT then
 
     --  draw spawners
     local perma_color, non_perma_color = Color( 255, 0, 0 ), Color( 0, 255, 0 )
-    hook.Add( "PostDrawTranslucentRenderables", "vkx_entspawner:spawners", function()
+    hook.Add( "PostDrawTranslucentRenderables", "vkx_entspawner:spawners", function( is_depth, is_skybox )
+        if is_skybox then return end
         if not vkx_entspawner.is_holding_tool() then return end
 
         for i, spawner in ipairs( vkx_entspawner.spawners ) do
@@ -281,6 +290,7 @@ elseif CLIENT then
 
     --  menu
     function TOOL.BuildCPanel( panel )
+        --  presets
         panel:AddControl( "ComboBox", {
             MenuButton = 1,
             Folder = "vkx_entspawner",
