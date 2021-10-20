@@ -86,7 +86,7 @@ if SERVER then
                 entities = chances,
                 max = spawner_max,
                 delay = spawner_delay,
-                perma = spawner_perma,
+                perma = is_perma,
                 radius = spawner_radius,
                 radius_disappear = spawner_radius_disappear,
             } )
