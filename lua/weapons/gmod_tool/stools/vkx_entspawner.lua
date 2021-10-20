@@ -3,6 +3,8 @@ TOOL.Name = "#tool.vkx_entspawner.name"
 
 TOOL.model = "models/editor/playerstart.mdl"
 
+TOOL.should_refresh_preview = true
+
 local convars
 function TOOL:LeftClick( tr )
     if SERVER then return true end
@@ -194,6 +196,11 @@ elseif CLIENT then
     end
 
     function TOOL:ComputeGhostEntities()
+        if not vkx_entspawner.is_holding_tool() then
+            self.should_refresh_preview = true
+            return
+        end
+
         local shapes, shape = list.Get( "vkx_entspawner_shapes" ), self:GetClientInfo( "shape" )
         if not shapes[shape] or not shapes[shape].compute then return false end
 
@@ -214,7 +221,14 @@ elseif CLIENT then
             self.ghost_entities[i] = nil
         end 
 
+        self.should_refresh_preview = false
         return true
+    end
+
+    function TOOL:Deploy()
+        if self.should_refresh_preview then
+            self:ComputeGhostEntities()
+        end
     end
 
     function TOOL:Think()
