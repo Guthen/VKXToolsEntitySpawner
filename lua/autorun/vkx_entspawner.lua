@@ -318,6 +318,7 @@ else
     function vkx_entspawner.run_spawner( spawner, callback, err_callback )
         for i, v in ipairs( spawner.locations ) do
             --  limit?
+            v.entities = v.entities or {}
             for i, ent in ipairs( v.entities ) do
                 if not IsValid( ent ) then
                     table.remove( v.entities, i )
