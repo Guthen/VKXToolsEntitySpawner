@@ -266,6 +266,7 @@ else
                         perma: (optional) bool Is a Permanent Spawner, if so, the spawner will be saved
                         radius: (optional) int Player Presence Radius, allow the spawner to run if a Player is in the radius 
                         radius_disappear: (optional) bool In addition to PPR, will disappear spawned entities if no Player is in the radius
+            | return: @EntitySpawner spawner
         
         @structure Location
             | description: Represents a position and an angle
@@ -277,7 +278,20 @@ else
             | description: Represents an entity class and his percent chance of getting it
             | params:
                 key: string Entity Class Name
-                percent: float Entity Chance, from 0 to 100 
+                percent: float Entity Chance, from 0 to 100
+        
+        @structure EntitySpawner
+            | description: Represents a spawner of entities
+            | params:
+                id: int Identifier of the spawner in the table `vkx_entspawner.spawners`
+                locations: table[@Location] List of locations (position and angles) where entities will spawn
+                entities: table[@EntityChance] List of spawnable entities 
+                max: int Number of maximum entities per location
+                delay: float Time needed between each spawn
+                perma: (optional) bool Is a Permanent Spawner, if so, the spawner will be saved
+                last_time: float Last time the spawner was runned, use of CurTime
+                radius: int Player Presence Radius, allow the spawner to run if a Player is in the radius 
+                radius_disappear: (optional) bool In addition to PPR, will disappear spawned entities if no Player is in the radius
     ]]
     function vkx_entspawner.new_spawner( spawner )
         --  round percent
@@ -293,7 +307,8 @@ else
         --  add spawner
         spawner.last_time = spawner.last_time or CurTime()
         spawner.radius = spawner.radius or 0
-        vkx_entspawner.spawners[#vkx_entspawner.spawners + 1] = spawner
+        spawner.id = spawner.id or #vkx_entspawner.spawners + 1
+        vkx_entspawner.spawners[spawner.id] = spawner
 
         --  save
         if spawner.perma then
@@ -301,7 +316,7 @@ else
         end
 
         vkx_entspawner.safe_network_spawners()
-        return #vkx_entspawner.spawners
+        return spawner
     end
 
     function vkx_entspawner.delete_spawner( id )
