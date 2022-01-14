@@ -5,22 +5,22 @@ TOOL.model = "models/editor/playerstart.mdl"
 
 TOOL.should_refresh_preview = true
 
-local convars
+local convars = {}
 function TOOL:LeftClick( tr )
     if SERVER then return true end
     if not IsFirstTimePredicted() then return end
 
-    if not self.ghost_entities or #self.ghost_entities == 0 then return false end
+    if not self.preview_locations or #self.preview_locations == 0 then return false end
     if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then 
         notification.AddLegacy( "You must have selected entities to spawn!", NOTIFY_ERROR, 3 )
         return true
     end
 
     local locations = {}
-    for i, v in ipairs( self.ghost_entities ) do
+    for i, v in ipairs( self.preview_locations ) do
         locations[#locations + 1] = {
-            pos = v:GetPos(),
-            ang = v:GetAngles(),
+            pos = v.pos,
+            ang = v.ang,
         }
     end
 
@@ -151,55 +151,30 @@ elseif CLIENT then
     language.Add( "tool.vkx_entspawner.reload", "Re-generate locations" )
 
     --  ghost entities
-    vkx_entspawner.delete_ghost_entities()  --  auto-refresh
-    TOOL.ghost_entities = {}
-    function TOOL:AddGhostEntity( pos, ang )
-        local ent = ClientsideModel( self.model, RENDERMODE_TRANSCOLOR )
-        if not IsValid( ent ) then return end
-        if pos then ent:SetPos( pos ) end
-        if ang then ent:SetAngles( ang ) end
-        ent:SetColor( Color( 255, 255, 255, 150 ) )
-        ent:Spawn()
-
-        self.ghost_entities[#self.ghost_entities + 1] = ent
+    vkx_entspawner.delete_preview_locations()  --  auto-refresh
+    TOOL.preview_locations = {}
+    function TOOL:ClearPreviewLocations()
+        self.preview_locations = {}
     end
 
-    function TOOL:ClearGhostEntities()
-        for i, v in ipairs( self.ghost_entities ) do
-            v:Remove()
-        end
-        self.ghost_entities = {}
-    end
-
-    function TOOL:UpdateGhostEntities( pos )
-        if not self.locations and self:ComputeGhostEntities() then return end
+    function TOOL:UpdatePreviewLocations( pos )
+        if not self.locations and not self:ComputePreviewLocations() then return end
 
         local ang = Angle( 0, ( LocalPlayer():GetPos() - pos ):Angle().y, 0 )
         for i, v in ipairs( self.locations ) do
-            if self.ghost_entities[i] then
-                --  some client entities might be removed so we create it again to avoid errors
-                if not IsValid( self.ghost_entities[i] ) then
-                    self:ClearGhostEntities()
-                    self:ComputeGhostEntities()
-                    break
-                end
+            --  rotate position
+            local rotated_pos = Vector( v.pos:Unpack() )
+            rotated_pos:Rotate( ang )
 
-                --  rotate position
-                local rotated_pos = Vector( v.pos:Unpack() )
-                rotated_pos:Rotate( ang )
-
-                --  compute final position and angle
-                self.ghost_entities[i]:SetPos( pos + rotated_pos )
-                self.ghost_entities[i]:SetAngles( ang + v.ang )
-            end
+            --  compute final position and angle
+            self.preview_locations[i] = self.preview_locations[i] or {}
+            self.preview_locations[i].pos = pos + rotated_pos
+            self.preview_locations[i].ang = ang + v.ang
         end
     end
 
-    function TOOL:ComputeGhostEntities()
-        if not vkx_entspawner.is_holding_tool() then
-            self.should_refresh_preview = true
-            return
-        end
+    function TOOL:ComputePreviewLocations()
+        if not vkx_entspawner.is_holding_tool() then return end
 
         local shapes, shape = list.Get( "vkx_entspawner_shapes" ), self:GetClientInfo( "shape" )
         if not shapes[shape] or not shapes[shape].compute then return false end
@@ -207,52 +182,47 @@ elseif CLIENT then
         local locations = shapes[shape].compute( self )
         if not locations then return false end
 
-        --  create new ghosts
-        for i, v in ipairs( locations ) do
-            if not self.ghost_entities[i] then
-                self:AddGhostEntity( v.pos, v.ang )
-            end
-        end
         self.locations = locations
-
-        --  clear other ghosts
-        for i = #locations + 1, #self.ghost_entities do
-            self.ghost_entities[i]:Remove()
-            self.ghost_entities[i] = nil
-        end 
-
-        self.should_refresh_preview = false
+        self:ClearPreviewLocations()
         return true
-    end
-
-    function TOOL:Deploy()
-        if self.should_refresh_preview then
-            self:ComputeGhostEntities()
-        end
     end
 
     function TOOL:Think()
-        if #self.ghost_entities == 0 then
-            self:ComputeGhostEntities()
+        if #self.preview_locations == 0 then
+            self:ComputePreviewLocations()
         end
-        self:UpdateGhostEntities( self:GetOwner():GetEyeTrace().HitPos )
+        self:UpdatePreviewLocations( self:GetOwner():GetEyeTrace().HitPos )
     end
 
     function TOOL:Reload( tr )
-        self:ComputeGhostEntities()
+        self:ComputePreviewLocations()
         return true
     end
 
-    function TOOL:Holster()
-        self:ClearGhostEntities()
-    end
+    --[[ function TOOL:Holster()
+        self:ClearPreviewLocations()
+    end ]]
 
     --  draw spawners
+    local preview_model = ClientsideModel( TOOL.model )
+    preview_model:SetNoDraw( true )
+
     local perma_color, non_perma_color = Color( 255, 0, 0 ), Color( 0, 255, 0 )
     hook.Add( "PostDrawTranslucentRenderables", "vkx_entspawner:spawners", function( is_depth, is_skybox )
         if is_skybox then return end
         if not vkx_entspawner.is_holding_tool() then return end
 
+        local tool = vkx_entspawner.get_tool()
+        if not tool then return end
+
+        for i, v in ipairs( tool.preview_locations ) do
+            preview_model:SetRenderOrigin( v.pos )
+            preview_model:SetRenderAngles( v.ang )
+            preview_model:SetupBones()
+            preview_model:DrawModel()
+        end
+
+        --  draw spawners
         for i, spawner in ipairs( vkx_entspawner.spawners ) do
             --  spawners
             for i, v in ipairs( spawner.locations ) do
@@ -267,12 +237,12 @@ elseif CLIENT then
             end
         end
 
-        --  radius preview
+        --  draw radius preview
         local tool = vkx_entspawner.get_tool()
         local radius, radius_disappear = tool:GetClientNumber( "spawner_radius", 0 ), tool:GetClientInfo( "spawner_radius_disappear" ) == "1"
         if radius > 0 then
             local locations = {}
-            for i, ent in ipairs( tool.ghost_entities ) do
+            for i, ent in ipairs( tool.preview_locations ) do
                 locations[i] = {
                     pos = ent:GetPos()
                 }
@@ -295,7 +265,7 @@ elseif CLIENT then
                     
                     draw.SimpleText( spawner.delay .. "s ─ " .. spawner.max .. " max", "Default", pos.x, pos.y, color )
                     for i, ent in ipairs( spawner.entities ) do
-                        draw.SimpleText( ent.key .. " (" .. ent.percent .. "%)", "Default", pos.x, pos.y + 15 * i, color )
+                        draw.SimpleText( ent.key .. " (" .. ent.percent * 100 .. "%)", "Default", pos.x, pos.y + 15 * i, color )
                     end
                 end
             end
@@ -303,22 +273,31 @@ elseif CLIENT then
     end )
 
     --  menu
+    local shape_setups = {
+        ["Int"] = function( panel, k, v )
+            panel:NumSlider( v.name or k, "vkx_entspawner_" .. k, v.template.options.min, v.template.options.max, 0 )
+        end,
+        ["Float"] = function( panel, k, v )
+            panel:NumSlider( v.name or k, "vkx_entspawner_" .. k, v.template.options.min, v.template.options.max, v.template.options.decimals or 2 )
+        end,
+        ["Boolean"] = function( panel, k, v )
+            panel:CheckBox( v.name or k, "vkx_entspawner_" .. k )
+        end,
+    }
     function TOOL.BuildCPanel( panel )
         --  presets
-        panel:AddControl( "ComboBox", {
-            MenuButton = 1,
-            Folder = "vkx_entspawner",
-            Options = {
-                ["#preset.default"] = convars,
-            },
-            CVars = table.GetKeys( convars ),
-        } )
+        local preset_control
+        if vkx_presets then
+            preset_control = vgui.Create( "VKXPresetControl", panel )
+            preset_control:Dock( TOP )
+            preset_control:SetCategory( "vkx_entspawner" )
+        end
 
         ---   shape
         local shape_form = vgui.Create( "DForm" )
         shape_form:SetName( "Shape" )
         panel:AddItem( shape_form )
-
+        
         local convar = GetConVar( "vkx_entspawner_shape" )
         local shape_combobox = shape_form:ComboBox( "Type" )
         for k in SortedPairsByMemberValue( list.Get( "vkx_entspawner_shapes" ), "z_order" ) do
@@ -331,30 +310,41 @@ elseif CLIENT then
                 end
             end
             convar:SetString( value )
-
+            
             --  refresh locations
             vkx_entspawner.refresh_tool_preview()
-
+            
             --  menu setup
             local shape = list.Get( "vkx_entspawner_shapes" )[value]
-            if not ( shape.setup ) then return shape_form:Help( "No settings!" ) end
+            if shape.setup then return shape.setup( shape_form ) end
+            
+            --  auto setup
+            local setuped = false
+            for k, v in SortedPairsByMemberValue( shape.convars or {}, "z_order" ) do
+                if v.template and shape_setups[v.template.type] then
+                    shape_setups[v.template.type]( shape_form, k, v )
+                    setuped = true
+                end
+            end
 
-            shape.setup( shape_form )
+            if not setuped then
+                shape_form:Help( "No settings!" )
+            end
         end
         shape_form:ControlHelp( "Represents the placement of spawners." )
         shape_combobox:SetSortItems( false )
         shape_combobox:OnSelect( 1, convar:GetString() )
-
+        
         ---   entities
         local entities_form = vgui.Create( "DForm" )
         entities_form:SetName( "Entities" )
         panel:AddItem( entities_form )
-
+        
         entities_form:Help( "Available Entities" )
         local entities_sheets, selected_list = vgui.Create( "DPropertySheet" )
         entities_sheets:SetTall( 175 )
         entities_form:AddItem( entities_sheets )
-
+        
         local function add_sheet( name, icon )
             local list_view = vgui.Create( "DListView" )
             list_view:SetMultiSelect( false )
@@ -373,10 +363,10 @@ elseif CLIENT then
                 menu:Open()
             end
             entities_sheets:AddSheet( name, list_view, icon )
-
+            
             return list_view
         end
-
+        
         --  weapons
         local weapons_list = add_sheet( "Weapons", "icon16/gun.png" )
         for k, v in pairs( list.Get( "Weapon" ) ) do
@@ -385,28 +375,28 @@ elseif CLIENT then
             end
         end
         weapons_list:SortByColumn( 2 )
-
+        
         --  entities
         local entities_list = add_sheet( "Entities", "icon16/bricks.png" )
         for k, v in pairs( list.Get( "SpawnableEntities" ) ) do
             entities_list:AddLine( v.PrintName, v.Category or "Other", k )
         end
         entities_list:SortByColumn( 2 )
-
+        
         --  npcs
         local npcs_list = add_sheet( "NPCs", "icon16/monkey.png" )
         for k, v in pairs( list.Get( "NPC" ) ) do
             npcs_list:AddLine( v.Name, v.Category, k )
         end
         npcs_list:SortByColumn( 2 )
-
+        
         --  vehicles
         local vehicles_list = add_sheet( "Vehicles", "icon16/car.png" )
         for k, v in pairs( list.Get( "Vehicles" ) ) do
             vehicles_list:AddLine( v.Name, v.Category, k )
         end
         vehicles_list:SortByColumn( 2 )
-
+        
         --  simfphys
         if simfphys then
             local simfphys_list = add_sheet( "simfphys", "icon16/car.png" )
@@ -415,7 +405,7 @@ elseif CLIENT then
             end
             simfphys_list:SortByColumn( 2 )
         end
-
+        
         --  selected
         local chance_slider
         entities_form:Help( "Selected Entities" )
@@ -426,7 +416,7 @@ elseif CLIENT then
         selected_list:AddColumn( "Category" )
         selected_list:AddColumn( "Key" )
         function selected_list:OnRowSelected( id, panel )
-            chance_slider:SetValue( vkx_entspawner.ents_chance[id] and vkx_entspawner.ents_chance[id].percent or 100 )
+            chance_slider:SetValue( vkx_entspawner.ents_chance[id] and vkx_entspawner.ents_chance[id].percent * 100 or 100 )
         end
         function selected_list:OnRowRightClick( id, panel )
             local menu = DermaMenu( panel )
@@ -448,15 +438,15 @@ elseif CLIENT then
                     return 
                 end
             end
-
+            
             add_line( self, name, category, key )
             vkx_entspawner.ents_chance[#self.Lines] = {
-                percent = 100,
+                percent = 1,
                 key = key,
             }
         end
         entities_form:AddItem( selected_list )
-
+        
         --  chance slider
         vkx_entspawner.ents_chance = {}
         chance_slider = entities_form:NumSlider( "Spawn Chance (%)", nil, 0, 100, 0 )
@@ -466,15 +456,15 @@ elseif CLIENT then
         function chance_slider:OnValueChanged( value )
             local id, selected = selected_list:GetSelectedLine()
             if not selected or not vkx_entspawner.ents_chance[id] then return end
-            vkx_entspawner.ents_chance[id].percent = value
+            vkx_entspawner.ents_chance[id].percent = math.Round( value / 100, 2 )
         end
         entities_form:ControlHelp( "Chance to spawn for the selected Entity. Note that the script will simulate the chance from the first to the last NPC of the list. However it will stop if the chance success (so avoid putting 100% chance at the top list)." )
-    
+        
         ---   spawner
         local spawner_form = vgui.Create( "DForm" )
         spawner_form:SetName( "Spawner" )
         panel:AddItem( spawner_form )
-
+        
         local spawner_check, perma_check, max_slider, delay_slider, radius_slider = spawner_form:CheckBox( "Is Spawner", "vkx_entspawner_is_spawner" )
         spawner_form:ControlHelp( "If checked, this tool will creates Entities Spawners instead of direct Entities." )
         function spawner_check:OnChange( value )
@@ -482,54 +472,125 @@ elseif CLIENT then
                 v:SetEnabled( value )
             end
         end
-
+        
         --  perma
         perma_check = spawner_form:CheckBox( "Is Perma", "vkx_entspawner_is_perma" )
         spawner_form:ControlHelp( "If checked, the created Entities spawners will be saved and loaded on server start. Note that red sphere spawners represent perma spawners and green are non-perma spawners." )
-    
+        
         --  max
-        max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", 1, 16, 0 )
+        local options = vkx_entspawner.template:get( "spawner_max" ):get_options()
+        max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", options.min, options.max, 0 )
         spawner_form:ControlHelp( "How many Entities can spawn for each spawner/location?" )
-
+        
         --  delay
-        delay_slider = spawner_form:NumSlider( "Spawn Delay", "vkx_entspawner_spawner_delay", 1, 120, 0 )
+        local options = vkx_entspawner.template:get( "spawner_delay" ):get_options()
+        delay_slider = spawner_form:NumSlider( "Spawn Delay", "vkx_entspawner_spawner_delay", options.min, options.max, 0 )
         spawner_form:ControlHelp( "How many seconds should the spawner wait between each spawn?" )
-
+        
         --  radius
-        radius_slider = spawner_form:NumSlider( "Player Spawn Radius", "vkx_entspawner_spawner_radius", 0, 2 ^ 16 - 1, 0 )
+        local options = vkx_entspawner.template:get( "spawner_radius" ):get_options()
+        radius_slider = spawner_form:NumSlider( "Player Spawn Radius", "vkx_entspawner_spawner_radius", options.min, options.max, 0 )
         spawner_form:ControlHelp( "If set above 0, the radius will define the area whenever the spawner will start to spawn entities depending of player presence. If a player is in the radius, the spawner will start spawning." )
-
+        
         --  radius disappear
         radius_disappear_check = spawner_form:CheckBox( "Player Disappear Radius", "vkx_entspawner_spawner_radius_disappear" )
         spawner_form:ControlHelp( "If checked, when no player is within the radius, spawned entities will automatically disappear." )
-
+        
         spawner_check:OnChange( spawner_check:GetChecked() )
+
+        --  presets
+        if vkx_presets then
+            preset_control:RegisterCallback( "shape", 
+                function( value )
+                    for i, v in ipairs( shape_combobox.Choices ) do
+                        if v == value then
+                            shape_combobox:ChooseOption( value, i )
+                            return
+                        end
+                    end
+                end,
+                function()
+                    return shape_combobox:GetSelected() 
+                end
+            )
+            preset_control:RegisterCallback( "ents_chance",
+                function( chances )
+                    vkx_entspawner.ents_chance = table.Copy( chances )
+                    selected_list:Clear()
+
+                    for i, chance in pairs( chances ) do
+                        local breaked = false
+
+                        for i, sheet in ipairs( entities_sheets.Items ) do
+                            for i, line in ipairs( sheet.Panel:GetLines() ) do
+                                if line:GetValue( 3 ) == chance.key then
+                                    add_line( selected_list, line:GetValue( 1 ), line:GetValue( 2 ), line:GetValue( 3 ) )
+                                    breaked = true
+                                    break
+                                end
+                            end
+
+                            if breaked then 
+                                break 
+                            end
+                        end
+                    end
+                end,
+                function()
+                    return vkx_entspawner.ents_chance
+                end
+            )
+
+            for convar in pairs( convars ) do
+                preset_control:RegisterConVar( convar:gsub( "vkx_entspawner_", "" ), convar )
+            end
+        end
     end
 end
 
 
 
 --  register convars
-local function add_convar( k, v )
+local template = vkx_presets and vkx_presets.new_template( "vkx_entspawner" )
+local function add_convar( k, v, template_type, template_options )
     TOOL.ClientConVar[k] = v
     if CLIENT then
         cvars.AddChangeCallback( TOOL.Mode .. "_" .. k, vkx_entspawner.refresh_tool_preview, "VKXTool" )
         vkx_entspawner.print( "Register %q (default: %q)", TOOL.Mode .. "_" .. k, v )
+
+        if template then
+            local keyvalue = template:add( k, v )
+            if template_type then keyvalue:as( template_type, template_options ) end
+        end
     end
 end
 
-add_convar( "shape", "None" )
-add_convar( "is_spawner", "0" )
-add_convar( "is_perma", "0" )
-add_convar( "spawner_max", "1" )
-add_convar( "spawner_delay", "3" )
-add_convar( "spawner_radius", "0" )
-add_convar( "spawner_radius_disappear", "0" )
+--  shapes
+local shapes = list.Get( "vkx_entspawner_shapes" )
+local values = {}
+for k, v in pairs( shapes ) do
+    values[k] = k
+end
+add_convar( "shape", "None", "Combo", { values = values } )
 
-for k, v in pairs( list.Get( "vkx_entspawner_shapes" ) ) do
+--  others
+add_convar( "is_spawner", "0", "Boolean" )
+add_convar( "is_perma", "0", "Boolean" )
+add_convar( "spawner_max", "1", "Int", { min = 1, max = 16 } )
+add_convar( "spawner_delay", "3", "Int", { min = 1, max = 120 } )
+add_convar( "spawner_radius", "0", "Int", { min = 0, max = 2 ^ 16 - 1 } )
+add_convar( "spawner_radius_disappear", "0", "Boolean" )
+
+for k, v in pairs( shapes ) do
     for cmd_k, cmd_v in pairs( v.convars or {} ) do
-        add_convar( cmd_k, cmd_v )
+        add_convar( cmd_k, cmd_v.default, cmd_v.template and cmd_v.template.type, cmd_v.template and cmd_v.template.options )
     end
+end
+
+if template then
+    template:add( "ents_chance", {} )
+    template:build_default_preset()
+    vkx_entspawner.template = template
 end
 
 convars = TOOL:BuildConVarList()

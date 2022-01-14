@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.2.3"
+vkx_entspawner.version = "2.3.0"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -53,14 +53,14 @@ if CLIENT then
     function vkx_entspawner.refresh_tool_preview()
         local tool = vkx_entspawner.get_tool()
         if tool then
-            tool:ComputeGhostEntities()
+            tool:ComputePreviewLocations()
         end
     end
 
-    function vkx_entspawner.delete_ghost_entities()
+    function vkx_entspawner.delete_preview_locations()
         local tool = vkx_entspawner.get_tool()
         if tool then
-            tool:ClearGhostEntities()
+            tool:ClearPreviewLocations()
         end
     end
 
@@ -263,9 +263,9 @@ else
                         entities: table[@EntityChance] List of spawnable entities 
                         max: int Number of maximum entities per location
                         delay: float Time needed between each spawn
-                        perma: (optional) bool Is a Permanent Spawner, if so, the spawner will be saved
-                        radius: (optional) int Player Presence Radius, allow the spawner to run if a Player is in the radius 
-                        radius_disappear: (optional) bool In addition to PPR, will disappear spawned entities if no Player is in the radius
+                        perma: bool? Is a Permanent Spawner, if so, the spawner will be saved
+                        radius: int? Player Presence Radius, allow the spawner to run if a Player is in the radius 
+                        radius_disappear: (bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
             | return: @EntitySpawner spawner
         
         @structure Location
@@ -278,7 +278,7 @@ else
             | description: Represents an entity class and his percent chance of getting it
             | params:
                 key: string Entity Class Name
-                percent: float Entity Chance, from 0 to 100
+                percent: float Entity Chance, from 0 to 1, rounded to 2 decimals
         
         @structure EntitySpawner
             | description: Represents a spawner of entities
@@ -288,15 +288,15 @@ else
                 entities: table[@EntityChance] List of spawnable entities 
                 max: int Number of maximum entities per location
                 delay: float Time needed between each spawn
-                perma: (optional) bool Is a Permanent Spawner, if so, the spawner will be saved
+                perma: bool? Is a Permanent Spawner, if so, the spawner will be saved
                 last_time: float Last time the spawner was runned, use of CurTime
                 radius: int Player Presence Radius, allow the spawner to run if a Player is in the radius 
-                radius_disappear: (optional) bool In addition to PPR, will disappear spawned entities if no Player is in the radius
+                radius_disappear: bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
     ]]
     function vkx_entspawner.new_spawner( spawner )
         --  round percent
         for i, v in ipairs( spawner.entities ) do
-            v.percent = math.Round( v.percent, 1 )
+            v.percent = math.Round( v.percent, 2 )
         end
 
         --  add 'entities' table to each location
@@ -343,7 +343,7 @@ else
             --  spawn
             if #v.entities < spawner.max then
                 for i, chance in ipairs( spawner.entities ) do
-                    if math.random() <= chance.percent / 100 then 
+                    if math.random() <= chance.percent then 
                         local obj, type = vkx_entspawner.spawn_object( chance.key, v.pos, v.ang )
                         if IsValid( obj ) then
                             local can_spawn, blocking_entity = vkx_entspawner.can_spawn_safely( obj )
@@ -494,13 +494,41 @@ list.Set( "vkx_entspawner_shapes", "None", {
 list.Set( "vkx_entspawner_shapes", "Circle", {
     z_order = 1,
     convars = {
-        circle_number = "3",
-        circle_radius = "64",
+        circle_number = {
+            name = "Number",
+            default = "3",
+            template = {
+                type = "Int",
+                options = {
+                    min = 1,
+                    max = 64,
+                },
+            },
+        },
+        circle_radius = {
+            name = "Radius",
+            default = "64",
+            template = {
+                type = "Float",
+                options = {
+                    min = 32,
+                    max = 1000,
+                    --decimals = 2,
+                },
+            },
+        },
+        offset_angle = {
+            name = "Offset Angle",
+            default = "0",
+            template = {
+                type = "Int",
+                options = {
+                    min = 0,
+                    max = 360,
+                },
+            },
+        },
     },
-    setup = function( panel )
-        panel:NumSlider( "Number", "vkx_entspawner_circle_number", 1, 64, 0 )
-        panel:NumSlider( "Radius", "vkx_entspawner_circle_radius", 32, 1000, 2 )
-    end,
     compute = function( tool )
         local positions = {}
         local radius, number = tool:GetClientNumber( "circle_radius", 64 ), tool:GetClientNumber( "circle_number", 1 )
@@ -509,7 +537,7 @@ list.Set( "vkx_entspawner_shapes", "Circle", {
             local ang = math.rad( a )
             positions[#positions + 1] = {
                 pos = Vector( math.cos( ang ), math.sin( ang ), 0 ) * radius,
-                ang = Angle( 0, a, 0 ),
+                ang = Angle( 0, a + tool:GetClientNumber( "offset_angle", 0 ), 0 ),
             }
         end
 
@@ -519,16 +547,43 @@ list.Set( "vkx_entspawner_shapes", "Circle", {
 list.Set( "vkx_entspawner_shapes", "Square", {
     z_order = 2,
     convars = {
-        square_offset = "64",
-        square_width = "3",
-        square_length = "3",
+        square_offset = {
+            z_order = 0,
+            name = "Offset",
+            default = "64",
+            template = {
+                type = "Int",
+                options = {
+                    min = 32,
+                    max = 1000,
+                },
+            },
+        },
+        square_width = {
+            z_order = 1,
+            name = "Width",
+            default = "3",
+            template = {
+                type = "Int",
+                options = {
+                    min = 1,
+                    max = 64,
+                },
+            },
+        },
+        square_length = {
+            z_order = 2,
+            name = "Length",
+            default = "3",
+            template = {
+                type = "Int",
+                options = {
+                    min = 1,
+                    max = 64,
+                },
+            },
+        },
     },
-    setup = function( panel )
-        panel:NumSlider( "Offset", "vkx_entspawner_square_offset", 32, 1000, 0 )
-        
-        panel:NumSlider( "Width", "vkx_entspawner_square_width", 1, 64, 0 )
-        panel:NumSlider( "Length", "vkx_entspawner_square_length", 1, 64, 0 )
-    end,
     compute = function( tool )
         local positions = {}
         local offset = tool:GetClientNumber( "square_offset", 64 )
@@ -553,17 +608,58 @@ list.Set( "vkx_entspawner_shapes", "Square", {
 list.Set( "vkx_entspawner_shapes", "Random", {
     z_order = 3,
     convars = {
-        random_number = "3",
-        random_radius = "64",
-        random_x_ratio = "1",
-        random_y_ratio = "1",
+        random_number = {
+            z_order = 0,
+            name = "Number",
+            default = "3",
+            template = {
+                type = "Int",
+                options = {
+                    min = 1,
+                    max = 64,
+                },
+            },
+        },
+        random_radius = {
+            z_order = 1,
+            name = "Radius",
+            default = "64",
+            template = {
+                type = "Float",
+                options = {
+                    min = 32,
+                    max = 1000,
+                    --decimals = 2,
+                },
+            },
+        },
+        random_x_ratio = {
+            z_order = 2,
+            name = "X Ratio",
+            default = "1",
+            template = {
+                type = "Float",
+                options = {
+                    min = 0,
+                    max = 1,
+                    --decimals = 2,
+                },
+            },
+        },
+        random_y_ratio = {
+            z_order = 3,
+            name = "Y Ratio",
+            default = "1",
+            template = {
+                type = "Float",
+                options = {
+                    min = 0,
+                    max = 1,
+                    --decimals = 2,
+                },
+            },
+        },
     },
-    setup = function( panel )
-        panel:NumSlider( "Number", "vkx_entspawner_random_number", 1, 64, 0 )
-        panel:NumSlider( "Radius", "vkx_entspawner_random_radius", 32, 1000, 2 )
-        panel:NumSlider( "X Ratio", "vkx_entspawner_random_x_ratio", 0, 1, 2 )
-        panel:NumSlider( "Y Ratio", "vkx_entspawner_random_y_ratio", 0, 1, 2 )
-    end,
     compute = function( tool )
         local positions = {}
         local radius, number = tool:GetClientNumber( "random_radius", 64 ), tool:GetClientNumber( "random_number", 1 )
