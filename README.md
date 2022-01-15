@@ -2,7 +2,11 @@
 ---
 ![Logo](vkx_entspawner.jpg)
 
-Available on [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2547807575)
+![Steam Views](https://img.shields.io/steam/views/2547807575?color=red&style=for-the-badge)
+![Steam Downloads](https://img.shields.io/steam/downloads/2547807575?color=red&style=for-the-badge)
+![Steam Favorites](https://img.shields.io/steam/favorites/2547807575?color=red&style=for-the-badge)
+
+This addon is available on the Workshop [here](https://steamcommunity.com/sharedfiles/filedetails/?id=2547807575)
 
 ## 📃 Description
 This is a tool made for **Garry's Mod** in order to *spawn random choosen entities* in a *specific shape* with or without a *spawner*.
