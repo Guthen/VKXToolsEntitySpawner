@@ -244,7 +244,7 @@ elseif CLIENT then
             local locations = {}
             for i, ent in ipairs( tool.preview_locations ) do
                 locations[i] = {
-                    pos = ent:GetPos()
+                    pos = ent.pos
                 }
             end
 
