@@ -1,11 +1,15 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.3.0"
+vkx_entspawner.version = "2.3.1"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
     ["keyframe_rope"] = true,
     ["trigger_multiple"] = true,
     ["trigger_once"] = true,
+
+    --  Gredwitch's Emplacements
+    ["gred_prop_emp"] = true,
+    ["gred_prop_part"] = true,
 }
 
 
@@ -191,7 +195,7 @@ else
     function vkx_entspawner.can_spawn_safely( ent )
         if not IsValid( ent ) then return false end
         --if ent:IsInWorld() then return false end
-
+        
         local pos = ent:GetPos()
         local min, max = ent:GetModelBounds()
         for i, v in ipairs( ents.FindInBox( pos + min, pos + max ) ) do
