@@ -1,11 +1,14 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.3.1"
+vkx_entspawner.version = "2.3.3"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
     ["keyframe_rope"] = true,
     ["trigger_multiple"] = true,
     ["trigger_once"] = true,
+
+    ["physgun_beam"] = true,
+    ["predicted_viewmodel"] = true,
 
     --  Gredwitch's Emplacements
     ["gred_prop_emp"] = true,
