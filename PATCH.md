@@ -10,3 +10,5 @@
 + **update:** `vkx_entspawner.new_spawner` return now an `@EntitySpawner` instead of the spawner's ID
 + **update:** `@EntityChance.percent` has been remapped from 0-100 to 0-1 (2 decimals) 
 + **update:** Shape's `convars` is now a table of table using a specific structure instead of a table of string containing the value (see end of the autorun file for examples). This is intended for giving enough information to the Preset System 
+
+# v2.3.1: Gredwitch's Emplacements compatibility

@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.3.3"
+vkx_entspawner.version = "2.3.4"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -9,10 +9,6 @@ vkx_entspawner.blocking_entity_blacklist = {
 
     ["physgun_beam"] = true,
     ["predicted_viewmodel"] = true,
-
-    --  Gredwitch's Emplacements
-    ["gred_prop_emp"] = true,
-    ["gred_prop_part"] = true,
 }
 
 
@@ -89,24 +85,43 @@ if CLIENT then
         notification.AddLegacy( net.ReadString(), net.ReadUInt( 3 ), 3 )
     end )
 else
+    local is_spawnlist_registering, entities_spawnlist = false, {}
+    hook.Add( "OnEntityCreated", "vkx_entspawner:can_spawn_safely", function( ent )
+        if is_spawnlist_registering then
+            entities_spawnlist[ent] = true
+        end
+    end )
+
     function vkx_entspawner.spawn_object( key, pos, ang )
         if not key or not pos or not ang then return end
 
+        is_spawnlist_registering = true
+        entities_spawnlist = {}
+
+        local obj, cat
         if list.Get( "Weapon" )[key] then
-            return vkx_entspawner.spawn_weapon( key, pos, ang )
+            obj, cat = vkx_entspawner.spawn_weapon( key, pos, ang )
         elseif list.Get( "NPC" )[key] then
-            return vkx_entspawner.spawn_npc( key, pos, ang )
+            obj, cat = vkx_entspawner.spawn_npc( key, pos, ang )
+        elseif scripted_ents.GetStored( key ) then
+            obj, cat = vkx_entspawner.spawn_sent( key, pos, ang )
         elseif list.Get( "SpawnableEntities" )[key] then
-            return vkx_entspawner.spawn_entity( key, pos, ang )
+            obj, cat = vkx_entspawner.spawn_entity( key, pos, ang )
         elseif list.Get( "Vehicles" )[key] then
-            return vkx_entspawner.spawn_vehicle( key, pos, ang )
+            obj, cat = vkx_entspawner.spawn_vehicle( key, pos, ang )
         elseif simfphys and list.Get( "simfphys_vehicles" )[key] then
             local vehicle = list.Get( "simfphys_vehicles" )[key]
-            if vehicle.SpawnOffset then pos = pos + vehicle.SpawnOffset end
-            return simfphys.SpawnVehicleSimple( key, pos, ang ), "vehicles"
+            if vehicle.SpawnOffset then 
+                pos = pos + vehicle.SpawnOffset 
+            end
+            obj, cat = simfphys.SpawnVehicleSimple( key, pos, ang ), "vehicles"
         else
-            return vkx_entspawner.print( "Try to spawn an Object %q which is not supported!", key )
+            obj, cat = vkx_entspawner.print( "Try to spawn an Object %q which is not supported!", key )
         end
+
+        is_spawnlist_registering = false
+
+        return obj, cat
     end
 
     function vkx_entspawner.spawn_vehicle( key, pos, ang )
@@ -129,6 +144,33 @@ else
         ent:Spawn()
 
         return ent, "vehicles"
+    end
+
+    function vkx_entspawner.spawn_sent( key, pos, ang )
+        local sent = scripted_ents.GetStored( key )
+        if not sent then
+            return vkx_entspawner.print( "Try to spawn an SENT %q which doesn't exists!", key )
+        end
+
+        local spawn_function = scripted_ents.GetMember( key, "SpawnFunction" )
+        if not spawn_function then 
+            return vkx_entspawner.spawn_entity( key, pos, ang ) 
+        end
+
+        local tr = util.TraceLine( {
+            start = pos,
+            endpos = pos - Vector( 0, 0, 1 ),
+        } )
+
+        ClassName = key
+        local success, ent = pcall( spawn_function, sent, NULL, tr, key ) --  as we don't have a valid player to give and that some entities might use ply, we have to be carefull
+        ClassName = nil
+
+        if success and IsValid( ent ) then
+            return ent, "sents"
+        else
+            return vkx_entspawner.spawn_entity( key, pos, ang )
+        end
     end
 
     function vkx_entspawner.spawn_entity( key, pos, ang )
@@ -202,7 +244,10 @@ else
         local pos = ent:GetPos()
         local min, max = ent:GetModelBounds()
         for i, v in ipairs( ents.FindInBox( pos + min, pos + max ) ) do
-            if not ( v == ent ) and not vkx_entspawner.blocking_entity_blacklist[v:GetClass()] and v:GetBrushPlaneCount() == 0 and not v:IsWeapon() then 
+            if v == ent then continue end
+            if entities_spawnlist and entities_spawnlist[v] then continue end
+
+            if not vkx_entspawner.blocking_entity_blacklist[v:GetClass()] and v:GetBrushPlaneCount() == 0 and not v:IsWeapon() then 
                 vkx_entspawner.debug_print( "%q is blocking %q from spawning", tostring( v ), tostring( ent ) )    
                 return false, v
             end
