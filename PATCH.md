@@ -11,4 +11,11 @@
 + **update:** `@EntityChance.percent` has been remapped from 0-100 to 0-1 (2 decimals) 
 + **update:** Shape's `convars` is now a table of table using a specific structure instead of a table of string containing the value (see end of the autorun file for examples). This is intended for giving enough information to the Preset System 
 
-# v2.3.1: Gredwitch's Emplacements compatibility
+# v2.3.1: Fix Gredwitch's Emplacements compatibility
+# v2.3.2: Add `physgun_beam` & `predicted_viewmodel` to blacklist
+# v2.3.3: Fix Entities Spawning for 3rd Party Addons
+## Users
++ **fix:** most of compatibility by spawning entities from **3rd Party Addons** is fixed including ─ but not limited to ─ **Gredwitch's Emplacements** & **WAC**
+
+## Developpers
++ **new:** added server-side function `vkx_entspawner.spawn_sent` which is used to spawn Scripted Entities instead of using `vkx_entspawner.spawn_entity` 
