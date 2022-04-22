@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.3.4"
+vkx_entspawner.version = "2.3.3"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -149,7 +149,7 @@ else
     function vkx_entspawner.spawn_sent( key, pos, ang )
         local sent = scripted_ents.GetStored( key )
         if not sent then
-            return vkx_entspawner.print( "Try to spawn an SENT %q which doesn't exists!", key )
+            return vkx_entspawner.print( "Try to spawn a SENT %q which doesn't exists!", key )
         end
 
         local spawn_function = scripted_ents.GetMember( key, "SpawnFunction" )
