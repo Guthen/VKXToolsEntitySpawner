@@ -19,3 +19,8 @@
 
 ## Developpers
 + **new:** added server-side function `vkx_entspawner.spawn_sent` which is used to spawn Scripted Entities instead of using `vkx_entspawner.spawn_entity` 
+# v2.4.0: Copy hovering Spawner Settings
+## Users
++ **new:** added ability to copy a spawner settings by pressing **Reload** with the tool while hovering the cursor on the spawner
+## Developpers
++ **fix:** reduce amount of data sent over network when a player request the creation of a spawner & while sending spawners to a player

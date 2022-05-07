@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.3.3"
+vkx_entspawner.version = "2.4.0"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -11,6 +11,13 @@ vkx_entspawner.blocking_entity_blacklist = {
     ["predicted_viewmodel"] = true,
 }
 
+--  network limitations
+vkx_entspawner.NET_LOCATIONS_BITS = 10 --  default: 10 (unsigned) bytes which allows 1023 different locations
+vkx_entspawner.NET_ENTS_CHANCE_BITS = 5 --  default: 5 (unsigned) bytes which allows 31 different entities
+vkx_entspawner.NET_SPAWNERS_BITS = 16 --  default: 16 (unsigned) bytes which allows 65535 different spawners
+vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS = 8 --  default: 8 (unsigned) bytes which allows networking up to 255 values
+vkx_entspawner.NET_SPAWNER_DELAY_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 seconds (18 hours)
+vkx_entspawner.NET_SPAWNER_RADIUS_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 units
 
 function vkx_entspawner.print( msg, ... )
     if #{ ... } > 0 then
@@ -69,7 +76,38 @@ if CLIENT then
 
     --  network spawners
     net.Receive( "vkx_entspawner:network", function( len )
-        local spawners = net.ReadTable()
+        local spawners = {}
+
+        for i = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNERS_BITS ) do
+            local spawner = {}
+            spawner.perma = net.ReadBool( spawner.perma )
+            
+            --  locations
+            spawner.locations = {}
+            for k = 1, net.ReadUInt( vkx_entspawner.NET_LOCATIONS_BITS ) do
+                spawner.locations[k] = {
+                    pos = net.ReadVector(),
+                    ang = net.ReadAngle(),
+                }
+            end
+
+            --  entities chance
+            spawner.entities = {}
+            for k = 1, net.ReadUInt( vkx_entspawner.NET_ENTS_CHANCE_BITS ) do
+                spawner.entities[k] = {
+                    key = net.ReadString(),
+                    percent = math.Round( net.ReadFloat(), 2 ),
+                }
+            end
+
+            spawner.max = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+            spawner.delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
+            spawner.radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
+            spawner.radius_disappear = net.ReadBool()
+
+            spawners[i] = spawner
+        end
+
         vkx_entspawner.spawners = spawners
     end )
 
@@ -375,7 +413,7 @@ else
         local spawner = vkx_entspawner.spawners[id]
         if not spawner then return end
 
-        vkx_entspawner.spawners[id] = nil
+        table.remove( vkx_entspawner.spawners, id )
         if spawner.perma then
             vkx_entspawner.save_perma_spawners()
         end
@@ -429,30 +467,31 @@ else
             end
         end
 
-        --  serialize spawners
-        local spawners = {}
-        for i, spawner in pairs( vkx_entspawner.spawners ) do
-            local cl_spawner = {}
-            cl_spawner.perma = spawner.perma or nil
-            cl_spawner.entities = spawner.entities
-            cl_spawner.max = spawner.max
-            cl_spawner.delay = spawner.delay
-            cl_spawner.radius = spawner.radius
-            cl_spawner.radius_disappear = spawner.radius_disappear
-            cl_spawner.locations = {}
-            for i, v in ipairs( spawner.locations ) do
-                --  avoid 'entities' table
-                cl_spawner.locations[#cl_spawner.locations + 1] = {
-                    pos = v.pos,
-                    ang = v.ang
-                }
-            end
-            spawners[#spawners + 1] = cl_spawner
-        end
-
         --  send
         net.Start( "vkx_entspawner:network" )
-            net.WriteTable( spawners )
+            net.WriteUInt( #vkx_entspawner.spawners, vkx_entspawner.NET_SPAWNERS_BITS )
+            for i, spawner in pairs( vkx_entspawner.spawners ) do
+                net.WriteBool( spawner.perma )
+                
+                --  locations
+                net.WriteUInt( #spawner.locations, vkx_entspawner.NET_LOCATIONS_BITS )
+                for i, v in ipairs( spawner.locations ) do
+                    net.WriteVector( v.pos )
+                    net.WriteAngle( v.ang )
+                end
+
+                --  entities chance
+                net.WriteUInt( #spawner.entities, vkx_entspawner.NET_ENTS_CHANCE_BITS )
+                for i, v in ipairs( spawner.entities ) do
+                    net.WriteString( v.key )
+                    net.WriteFloat( v.percent )
+                end
+
+                net.WriteUInt( spawner.max, vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+                net.WriteUInt( spawner.delay, vkx_entspawner.NET_SPAWNER_DELAY_BITS )
+                net.WriteUInt( spawner.radius, vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
+                net.WriteBool( spawner.radius_disappear )
+            end
         net.Send( ply or admins )
     end
 

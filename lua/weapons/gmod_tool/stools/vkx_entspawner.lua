@@ -16,24 +16,27 @@ function TOOL:LeftClick( tr )
         return true
     end
 
-    local locations = {}
-    for i, v in ipairs( self.preview_locations ) do
-        locations[#locations + 1] = {
-            pos = v.pos,
-            ang = v.ang,
-        }
-    end
-
     local is_spawner = tobool( self:GetClientNumber( "is_spawner", 0 ) )
     net.Start( "vkx_entspawner:spawn" )
-        net.WriteTable( locations )
-        net.WriteTable( table.ClearKeys( vkx_entspawner.ents_chance ) )
+        --  locations
+        net.WriteUInt( #self.preview_locations, vkx_entspawner.NET_LOCATIONS_BITS )
+        for i, v in ipairs( self.preview_locations ) do
+            net.WriteVector( v.pos )
+            net.WriteAngle( v.ang )
+        end
+        --  entities chance
+        net.WriteUInt( #vkx_entspawner.ents_chance, vkx_entspawner.NET_ENTS_CHANCE_BITS )
+        for i, v in ipairs( vkx_entspawner.ents_chance ) do
+            net.WriteString( v.key )
+            net.WriteFloat( v.percent )
+        end
+        --  spawner
         net.WriteBool( is_spawner )
         if is_spawner then
-            net.WriteBool( tobool( self:GetClientNumber( "is_perma", 0 ) ) )
-            net.WriteUInt( self:GetClientNumber( "spawner_max", 1 ), 8 )
-            net.WriteUInt( self:GetClientNumber( "spawner_delay", 3 ), 10 )
-            net.WriteUInt( self:GetClientNumber( "spawner_radius", 0 ), 16 )
+            net.WriteBool( self:GetClientNumber( "is_perma", 0 ) )
+            net.WriteUInt( self:GetClientNumber( "spawner_max", 1 ), vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+            net.WriteUInt( self:GetClientNumber( "spawner_delay", 3 ), vkx_entspawner.NET_SPAWNER_DELAY_BITS )
+            net.WriteUInt( self:GetClientNumber( "spawner_radius", 0 ), vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
             net.WriteBool( self:GetClientNumber( "spawner_radius_disappear", 0 ) )
         end
     net.SendToServer()
@@ -65,16 +68,47 @@ if SERVER then
         if not ply:IsSuperAdmin() then return ply:ChatPrint( "This tool is reserved for SuperAdmin only!" ) end
         if last_times[ply] and CurTime() - last_times[ply] <= .1 then return vkx_entspawner.debug_print( "%q is spamming, aborting request", ply:GetName() ) end --  avoid unwanted spam
         
-        local locations = net.ReadTable()
-        if not locations or #locations == 0 then 
-            return vkx_entspawner.debug_print( "%q didn't send locations", ply:GetName() ) 
+        --  locations
+        local locations_count = net.ReadUInt( vkx_entspawner.NET_LOCATIONS_BITS )
+        if locations_count == 0 then 
+            return vkx_entspawner.debug_print( "failed to receive the length of the locations from %q", ply:GetName() ) 
         end
 
-        local chances = net.ReadTable()
-        if not chances or #chances == 0 then 
-            return vkx_entspawner.debug_print( "%q didn't send chances", ply:GetName() ) 
+        local locations = {}
+        for i = 1, locations_count do
+            local pos = net.ReadVector()
+            if pos:IsZero() then return vkx_entspawner.debug_print( "failed to receive a valid location position from %q", ply:GetName() ) end
+            
+            local ang = net.ReadAngle()
+            if ang:IsZero() then return vkx_entspawner.debug_print( "failed to receive a valid location angle from %q", ply:GetName() ) end
+            
+            locations[i] = {
+                pos = pos,
+                ang = ang,
+            }
         end
 
+        --  chances
+        local chances_count = net.ReadUInt( vkx_entspawner.NET_ENTS_CHANCE_BITS )
+        if chances_count == 0 then 
+            return vkx_entspawner.debug_print( "failed to receive the length of the entities chance from %q", ply:GetName() ) 
+        end
+
+        local chances = {}
+        for i = 1, chances_count do
+            local key = net.ReadString()
+            if #key == 0 then return vkx_entspawner.debug_print( "failed to receive a valid entity key from %q", ply:GetName() ) end
+
+            local percent = net.ReadFloat()
+            if percent == 0 then return vkx_entspawner.debug_print( "failed to receive a valid entity percent from %q", ply:GetName() ) end
+
+            chances[i] = {
+                key = key,
+                percent = percent,
+            }
+        end
+
+        --  spawner
         local is_spawner, is_perma, spawner_max, spawner_delay, spawner_radius, spawner_radius_disappear = net.ReadBool()
         if is_spawner then
             is_perma = net.ReadBool()
@@ -148,7 +182,7 @@ elseif CLIENT then
     language.Add( "tool.vkx_entspawner.desc", "Create customizable Entity Spawners." )
     language.Add( "tool.vkx_entspawner.left", "Spawn Entities/Spawners" )
     language.Add( "tool.vkx_entspawner.right", "Remove already-placed Spawners" )
-    language.Add( "tool.vkx_entspawner.reload", "Re-generate locations" )
+    language.Add( "tool.vkx_entspawner.reload", "Copy hovering spawner settings or Re-generate locations otherwise" )
 
     --  ghost entities
     vkx_entspawner.delete_preview_locations()  --  auto-refresh
@@ -195,6 +229,27 @@ elseif CLIENT then
     end
 
     function TOOL:Reload( tr )
+        for id, spawner in pairs( vkx_entspawner.spawners ) do
+            for i, loc in ipairs( spawner.locations ) do
+                if loc.pos:DistToSqr( tr.HitPos ) <= min_dist_sqr then
+                    --  copying values
+                    vkx_entspawner.ents_chance = {}
+                    for j, ent in ipairs( spawner.entities ) do
+                        vkx_entspawner.ents_chance[j] = ent
+                    end
+                    GetConVar( "vkx_entspawner_is_spawner" ):SetBool( true )
+                    GetConVar( "vkx_entspawner_is_perma" ):SetBool( spawner.perma )
+                    GetConVar( "vkx_entspawner_spawner_max" ):SetInt( spawner.max )
+                    GetConVar( "vkx_entspawner_spawner_delay" ):SetInt( spawner.delay )
+                    GetConVar( "vkx_entspawner_spawner_radius" ):SetInt( spawner.radius )
+                    GetConVar( "vkx_entspawner_spawner_radius_disappear" ):SetBool( spawner.radius_disappear )
+                    self:RebuildCPanel() --  necessary to updates selected entities list 
+
+                    return true
+                end
+            end
+        end
+
         self:ComputePreviewLocations()
         return true
     end
@@ -291,6 +346,7 @@ elseif CLIENT then
             preset_control = vgui.Create( "VKXPresetControl", panel )
             preset_control:Dock( TOP )
             preset_control:SetCategory( "vkx_entspawner" )
+            panel.Items[#panel.Items + 1] = preset_control --  needed to be cleared
         end
 
         ---   shape
@@ -367,11 +423,31 @@ elseif CLIENT then
             return list_view
         end
         
+
+        --  cache category, name & key of entities present in `vkx_entspawner.ents_chance` to add them just after 
+        local cache_ents_chance_lines = {}
+        local function cache_ents_chance_data( key, name, category )
+            if #vkx_entspawner.ents_chance - #cache_ents_chance_lines <= 0 then return end
+
+            for i, v in ipairs( vkx_entspawner.ents_chance ) do
+                if v.key == key then
+                    cache_ents_chance_lines[#cache_ents_chance_lines + 1] = {
+                        key = key,
+                        name = name,
+                        category = category,
+                    }
+                    return
+                end
+            end
+        end
+
         --  weapons
         local weapons_list = add_sheet( "Weapons", "icon16/gun.png" )
         for k, v in pairs( list.Get( "Weapon" ) ) do
             if v.Spawnable then
-                weapons_list:AddLine( v.PrintName, v.Category or "Other", k )
+                local category = v.Category or "Other"
+                weapons_list:AddLine( v.PrintName, category, k )
+                cache_ents_chance_data( k, v.PrintName, category )
             end
         end
         weapons_list:SortByColumn( 2 )
@@ -379,7 +455,9 @@ elseif CLIENT then
         --  entities
         local entities_list = add_sheet( "Entities", "icon16/bricks.png" )
         for k, v in pairs( list.Get( "SpawnableEntities" ) ) do
-            entities_list:AddLine( v.PrintName, v.Category or "Other", k )
+            local category = v.Category or "Other"
+            entities_list:AddLine( v.PrintName, category, k )
+            cache_ents_chance_data( k, v.PrintName, category )
         end
         entities_list:SortByColumn( 2 )
         
@@ -387,6 +465,7 @@ elseif CLIENT then
         local npcs_list = add_sheet( "NPCs", "icon16/monkey.png" )
         for k, v in pairs( list.Get( "NPC" ) ) do
             npcs_list:AddLine( v.Name, v.Category, k )
+            cache_ents_chance_data( k, v.Name, v.Category )
         end
         npcs_list:SortByColumn( 2 )
         
@@ -394,6 +473,7 @@ elseif CLIENT then
         local vehicles_list = add_sheet( "Vehicles", "icon16/car.png" )
         for k, v in pairs( list.Get( "Vehicles" ) ) do
             vehicles_list:AddLine( v.Name, v.Category, k )
+            cache_ents_chance_data( k, v.Name, v.Category )
         end
         vehicles_list:SortByColumn( 2 )
         
@@ -402,6 +482,7 @@ elseif CLIENT then
             local simfphys_list = add_sheet( "simfphys", "icon16/car.png" )
             for k, v in pairs( list.Get( "simfphys_vehicles" ) ) do
                 simfphys_list:AddLine( v.Name, v.Category, k )
+                cache_ents_chance_data( k, v.Name, v.Category )
             end
             simfphys_list:SortByColumn( 2 )
         end
@@ -446,9 +527,13 @@ elseif CLIENT then
             }
         end
         entities_form:AddItem( selected_list )
+
+        --  add cached list
+        for i, v in ipairs( cache_ents_chance_lines ) do
+            add_line( selected_list, v.name, v.category, v.key )
+        end
         
         --  chance slider
-        vkx_entspawner.ents_chance = {}
         chance_slider = entities_form:NumSlider( "Spawn Chance (%)", nil, 0, 100, 0 )
         function chance_slider:Think()
             self:SetEnabled( selected_list:GetSelectedLine() )
@@ -545,6 +630,14 @@ elseif CLIENT then
                 preset_control:RegisterConVar( convar:gsub( "vkx_entspawner_", "" ), convar )
             end
         end
+    end
+
+    function TOOL:RebuildCPanel()
+        local panel = controlpanel.Get( self.Mode )
+        if not panel then vkx_entspawner.print( "Unable to rebuild the control panel of the tool : not found!" ) end
+
+        panel:ClearControls()
+        self.BuildCPanel( panel )
     end
 end
 
