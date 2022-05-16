@@ -318,7 +318,7 @@ else
         file.CreateDir( folder )
 
         --  save
-        local json = util.TableToJSON( spawners )
+        local json = util.TableToJSON( spawners, true )
         if not json then return vkx_entspawner.print( "Failed to save the perma spawners!" ) end
         file.Write( vkx_entspawner.save_path:format( game.GetMap() ), json )
     end
