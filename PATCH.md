@@ -24,3 +24,4 @@
 + **new:** added ability to copy a spawner settings by pressing **Reload** with the tool while hovering the cursor on the spawner
 ## Developpers
 + **fix:** reduce amount of data sent over network when a player request the creation of a spawner & while sending spawners to a player
+# v2.4.1: Saving w/ pretty JSON
