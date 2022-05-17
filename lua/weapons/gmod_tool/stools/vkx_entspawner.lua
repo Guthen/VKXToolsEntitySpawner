@@ -112,9 +112,9 @@ if SERVER then
         local is_spawner, is_perma, spawner_max, spawner_delay, spawner_radius, spawner_radius_disappear = net.ReadBool()
         if is_spawner then
             is_perma = net.ReadBool()
-            spawner_max = net.ReadUInt( 8 )
-            spawner_delay = net.ReadUInt( 10 )
-            spawner_radius = net.ReadUInt( 16 )
+            spawner_max = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+            spawner_delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
+            spawner_radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
             spawner_radius_disappear = net.ReadBool()
 
             local spawner = vkx_entspawner.new_spawner( {

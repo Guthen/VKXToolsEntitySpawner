@@ -25,3 +25,4 @@
 ## Developpers
 + **fix:** reduce amount of data sent over network when a player request the creation of a spawner & while sending spawners to a player
 # v2.4.1: Saving w/ pretty JSON
+# v2.4.2: Fix Networking issues upon Spawner Creation
