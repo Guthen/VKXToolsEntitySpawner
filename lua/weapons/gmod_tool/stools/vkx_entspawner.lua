@@ -6,6 +6,10 @@ TOOL.model = "models/editor/playerstart.mdl"
 TOOL.should_refresh_preview = true
 
 local convars = {}
+local min_dist = 32
+local min_dist_sqr = min_dist ^ 2
+
+--  add spawners
 function TOOL:LeftClick( tr )
     if SERVER then 
         if game.SinglePlayer() then
@@ -49,8 +53,7 @@ function TOOL:LeftClick( tr )
     return true
 end
 
-local min_dist = 32
-local min_dist_sqr = min_dist ^ 2
+--  remove spawners
 function TOOL:RightClick( tr )
     if CLIENT then return true end
 
@@ -64,6 +67,54 @@ function TOOL:RightClick( tr )
     end
 
     return false
+end
+
+--  copy spawners or re-compute locations
+function TOOL:Reload( tr )
+    if SERVER then
+        if game.SinglePlayer() then
+            self.SWEP:CallOnClient( "Reload" )
+        end
+        return true
+    end
+
+    --  must have built the panel first
+    if not vkx_entspawner.selected_list then 
+        notification.AddLegacy( "You must have open the panel first!", NOTIFY_ERROR, 3 )
+        return false 
+    end
+
+    for id, spawner in pairs( vkx_entspawner.spawners ) do
+        for i, loc in ipairs( spawner.locations ) do
+            if loc.pos:DistToSqr( tr.HitPos ) <= min_dist_sqr then
+                --  reset
+                vkx_entspawner.ents_chance = {}
+                vkx_entspawner.selected_list:Clear()
+                
+                --  copying values
+                for j, ent in ipairs( spawner.entities ) do
+                    local data = vkx_entspawner.ents_data_cache[ent.key]
+                    if data then
+                        vkx_entspawner.ents_chance[j] = ent
+                        vkx_entspawner.selected_list:add_line( data.name, data.category, ent.key )
+                    else
+                        vkx_entspawner.debug_print( "Failed to get cached entity data on %q", ent.key )
+                    end
+                end
+                GetConVar( "vkx_entspawner_is_spawner" ):SetBool( true )
+                GetConVar( "vkx_entspawner_is_perma" ):SetBool( spawner.perma )
+                GetConVar( "vkx_entspawner_spawner_max" ):SetInt( spawner.max )
+                GetConVar( "vkx_entspawner_spawner_delay" ):SetInt( spawner.delay )
+                GetConVar( "vkx_entspawner_spawner_radius" ):SetInt( spawner.radius )
+                GetConVar( "vkx_entspawner_spawner_radius_disappear" ):SetBool( spawner.radius_disappear )
+                
+                return true
+            end
+        end
+    end
+
+    self:ComputePreviewLocations()
+    return true
 end
 
 if SERVER then
@@ -234,32 +285,6 @@ elseif CLIENT then
         self:UpdatePreviewLocations( self:GetOwner():GetEyeTrace().HitPos )
     end
 
-    function TOOL:Reload( tr )
-        for id, spawner in pairs( vkx_entspawner.spawners ) do
-            for i, loc in ipairs( spawner.locations ) do
-                if loc.pos:DistToSqr( tr.HitPos ) <= min_dist_sqr then
-                    --  copying values
-                    vkx_entspawner.ents_chance = {}
-                    for j, ent in ipairs( spawner.entities ) do
-                        vkx_entspawner.ents_chance[j] = ent
-                    end
-                    GetConVar( "vkx_entspawner_is_spawner" ):SetBool( true )
-                    GetConVar( "vkx_entspawner_is_perma" ):SetBool( spawner.perma )
-                    GetConVar( "vkx_entspawner_spawner_max" ):SetInt( spawner.max )
-                    GetConVar( "vkx_entspawner_spawner_delay" ):SetInt( spawner.delay )
-                    GetConVar( "vkx_entspawner_spawner_radius" ):SetInt( spawner.radius )
-                    GetConVar( "vkx_entspawner_spawner_radius_disappear" ):SetBool( spawner.radius_disappear )
-                    self:RebuildCPanel() --  necessary to updates selected entities list 
-
-                    return true
-                end
-            end
-        end
-
-        self:ComputePreviewLocations()
-        return true
-    end
-
     --[[ function TOOL:Holster()
         self:ClearPreviewLocations()
     end ]]
@@ -346,6 +371,9 @@ elseif CLIENT then
         end,
     }
     function TOOL.BuildCPanel( panel )
+        vkx_entspawner.ents_chance = {}
+        vkx_entspawner.ents_data_cache = {}
+
         --  presets
         local preset_control
         if vkx_presets then
@@ -428,24 +456,6 @@ elseif CLIENT then
             
             return list_view
         end
-        
-
-        --  cache category, name & key of entities present in `vkx_entspawner.ents_chance` to add them just after 
-        local cache_ents_chance_lines = {}
-        local function cache_ents_chance_data( key, name, category )
-            if #vkx_entspawner.ents_chance - #cache_ents_chance_lines <= 0 then return end
-
-            for i, v in ipairs( vkx_entspawner.ents_chance ) do
-                if v.key == key then
-                    cache_ents_chance_lines[#cache_ents_chance_lines + 1] = {
-                        key = key,
-                        name = name,
-                        category = category,
-                    }
-                    return
-                end
-            end
-        end
 
         --  weapons
         local weapons_list = add_sheet( "Weapons", "icon16/gun.png" )
@@ -453,7 +463,7 @@ elseif CLIENT then
             if v.Spawnable then
                 local category = v.Category or "Other"
                 weapons_list:AddLine( v.PrintName, category, k )
-                cache_ents_chance_data( k, v.PrintName, category )
+                vkx_entspawner.cache_entity_data( k, v.PrintName, category )
             end
         end
         weapons_list:SortByColumn( 2 )
@@ -463,7 +473,7 @@ elseif CLIENT then
         for k, v in pairs( list.Get( "SpawnableEntities" ) ) do
             local category = v.Category or "Other"
             entities_list:AddLine( v.PrintName, category, k )
-            cache_ents_chance_data( k, v.PrintName, category )
+            vkx_entspawner.cache_entity_data( k, v.PrintName, category )
         end
         entities_list:SortByColumn( 2 )
         
@@ -471,7 +481,7 @@ elseif CLIENT then
         local npcs_list = add_sheet( "NPCs", "icon16/monkey.png" )
         for k, v in pairs( list.Get( "NPC" ) ) do
             npcs_list:AddLine( v.Name, v.Category, k )
-            cache_ents_chance_data( k, v.Name, v.Category )
+            vkx_entspawner.cache_entity_data( k, v.Name, v.Category )
         end
         npcs_list:SortByColumn( 2 )
         
@@ -479,7 +489,7 @@ elseif CLIENT then
         local vehicles_list = add_sheet( "Vehicles", "icon16/car.png" )
         for k, v in pairs( list.Get( "Vehicles" ) ) do
             vehicles_list:AddLine( v.Name, v.Category, k )
-            cache_ents_chance_data( k, v.Name, v.Category )
+            vkx_entspawner.cache_entity_data( k, v.Name, v.Category )
         end
         vehicles_list:SortByColumn( 2 )
         
@@ -488,7 +498,7 @@ elseif CLIENT then
             local simfphys_list = add_sheet( "simfphys", "icon16/car.png" )
             for k, v in pairs( list.Get( "simfphys_vehicles" ) ) do
                 simfphys_list:AddLine( v.Name, v.Category, k )
-                cache_ents_chance_data( k, v.Name, v.Category )
+                vkx_entspawner.cache_entity_data( k, v.Name, v.Category )
             end
             simfphys_list:SortByColumn( 2 )
         end
@@ -533,11 +543,6 @@ elseif CLIENT then
             }
         end
         entities_form:AddItem( selected_list )
-
-        --  add cached list
-        for i, v in ipairs( cache_ents_chance_lines ) do
-            add_line( selected_list, v.name, v.category, v.key )
-        end
         
         --  chance slider
         chance_slider = entities_form:NumSlider( "Spawn Chance (%)", nil, 0, 100, 0 )
@@ -636,6 +641,10 @@ elseif CLIENT then
                 preset_control:RegisterConVar( convar:gsub( "vkx_entspawner_", "" ), convar )
             end
         end
+
+        --  bind values
+        vkx_entspawner.selected_list = selected_list
+        vkx_entspawner.selected_list.add_line = add_line
     end
 
     function TOOL:RebuildCPanel()

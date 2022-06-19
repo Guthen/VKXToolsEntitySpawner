@@ -34,8 +34,7 @@ It allows you to spawn a lot of entities, see the following list of *compatibles
 Green spawners are non-permanent spawners and red spawners are permanent (saved and loaded on server restart) ones.
 
 ### ❗ Known Issues
-#### *"It do nothing when I left click"*
-Due to prediction system, the tool **doesn't work properly on singleplayer**. If you want to use this tool in solo, I recommand you to create a **+2 players game** (in the game starting options).
+No issues
 
 ### 💡 Contributions
 If you are a developper and you want to help, I'm opened to contributions as long as you respect my **code style**. 

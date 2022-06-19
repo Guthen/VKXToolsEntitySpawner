@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.4.3"
+vkx_entspawner.version = "2.4.4"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -45,6 +45,15 @@ end
 
 if CLIENT then
     vkx_entspawner.ents_chance = vkx_entspawner.ents_chance or {}
+    vkx_entspawner.ents_data_cache = vkx_entspawner.ents_data_cache or {}
+
+    function vkx_entspawner.cache_entity_data( key, name, category )
+        vkx_entspawner.ents_data_cache[key] = {
+            key = key,
+            name = name,
+            category = category,
+        }
+    end
 
     function vkx_entspawner.is_holding_tool()
         if not IsValid( LocalPlayer() ) then return false end 

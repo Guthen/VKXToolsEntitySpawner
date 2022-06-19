@@ -27,3 +27,4 @@
 # v2.4.1: Saving w/ pretty JSON
 # v2.4.2: Fix Networking issues upon Spawner Creation
 # v2.4.3: Single Player support
+# v2.4.4: Copying Spawners no longer freezes game & Single Player Copy support 
