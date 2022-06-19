@@ -7,8 +7,13 @@ TOOL.should_refresh_preview = true
 
 local convars = {}
 function TOOL:LeftClick( tr )
-    if SERVER then return true end
-    if not IsFirstTimePredicted() then return end
+    if SERVER then 
+        if game.SinglePlayer() then
+            self.SWEP:CallOnClient( "PrimaryAttack" )
+        end
+        return true 
+    end
+    if not game.SinglePlayer() and not IsFirstTimePredicted() then return end
 
     if not self.preview_locations or #self.preview_locations == 0 then return false end
     if not vkx_entspawner.ents_chance or table.Count( vkx_entspawner.ents_chance ) == 0 then 
@@ -48,7 +53,6 @@ local min_dist = 32
 local min_dist_sqr = min_dist ^ 2
 function TOOL:RightClick( tr )
     if CLIENT then return true end
-    if not IsFirstTimePredicted() then return end
 
     for id, spawner in pairs( vkx_entspawner.spawners ) do
         for i, v in ipairs( spawner.locations ) do
@@ -58,6 +62,8 @@ function TOOL:RightClick( tr )
             end
         end
     end
+
+    return false
 end
 
 if SERVER then
