@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.5.0"
+vkx_entspawner.version = "2.5.1"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -351,6 +351,7 @@ else
         --  add spawners
         for i, spawner in pairs( spawners ) do
             spawner.perma = true
+            spawner.id = nil
             vkx_entspawner.new_spawner( spawner, true )
         end
         vkx_entspawner.save_perma_spawners()
