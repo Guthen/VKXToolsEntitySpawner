@@ -351,8 +351,10 @@ else
         --  add spawners
         for i, spawner in pairs( spawners ) do
             spawner.perma = true
-            vkx_entspawner.new_spawner( spawner )
+            vkx_entspawner.new_spawner( spawner, true )
         end
+        vkx_entspawner.save_perma_spawners()
+
         vkx_entspawner.print( "Load %d spawners!", #spawners )
     end
     hook.Add( "InitPostEntity", "vkx_entspawner:spawner", vkx_entspawner.load_perma_spawners )
@@ -398,7 +400,7 @@ else
                 radius: int Player Presence Radius, allow the spawner to run if a Player is in the radius 
                 radius_disappear: bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
     ]]
-    function vkx_entspawner.new_spawner( spawner )
+    function vkx_entspawner.new_spawner( spawner, nosave )
         --  round percent
         for i, v in ipairs( spawner.entities ) do
             v.percent = math.Round( v.percent, 2 )
@@ -416,7 +418,7 @@ else
         vkx_entspawner.spawners[spawner.id] = spawner
 
         --  save
-        if spawner.perma then
+        if not nosave and spawner.perma then
             vkx_entspawner.save_perma_spawners()
         end
 
