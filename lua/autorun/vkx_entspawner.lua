@@ -122,7 +122,7 @@ if CLIENT then
         end
 
         vkx_entspawner.spawners = spawners
-        vkx_entspawner.debug_print( "received %d spawners (%d bytes)", #spawners, len )
+        vkx_entspawner.debug_print( "received %d spawners (%s)", #spawners, string.NiceSize( len / 8 ) )
     end )
 
     local function retrieve_spawners()
