@@ -320,6 +320,7 @@ else
                 end
                 spawner.last_time = nil
                 spawner.perma = nil
+                spawner.id = nil
 
                 spawners[#spawners + 1] = spawner
             end
@@ -487,8 +488,9 @@ else
         if #admins == 0 then return end
 
         --  send
+        local spawners_count = table.Count( vkx_entspawner.spawners )
         net.Start( "vkx_entspawner:network" )
-            net.WriteUInt( #vkx_entspawner.spawners, vkx_entspawner.NET_SPAWNERS_BITS )
+            net.WriteUInt( spawners_count, vkx_entspawner.NET_SPAWNERS_BITS )
             for i, spawner in pairs( vkx_entspawner.spawners ) do
                 net.WriteBool( spawner.perma )
                 
