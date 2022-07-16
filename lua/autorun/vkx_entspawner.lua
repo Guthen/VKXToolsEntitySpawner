@@ -27,9 +27,13 @@ function vkx_entspawner.print( msg, ... )
     end
 end
 
-local convar_debug = CreateConVar( "vkx_entspawner_debug", "0" )
+local convar_debug = CreateConVar( "vkx_entspawner_debug", "0", FCVAR_ARCHIVE, "enables debug messages", 0, 1 )
+function vkx_entspawner.is_debug()
+    return convar_debug:GetBool()
+end
+
 function vkx_entspawner.debug_print( msg, ... )
-    if not convar_debug:GetBool() then return end
+    if not vkx_entspawner.is_debug() then return end
     vkx_entspawner.print( "Debug: " .. msg, ... )
 end
 
@@ -118,6 +122,7 @@ if CLIENT then
         end
 
         vkx_entspawner.spawners = spawners
+        vkx_entspawner.debug_print( "received %d spawners (%d bytes)", #spawners, len )
     end )
 
     local function retrieve_spawners()
@@ -474,7 +479,12 @@ else
                     admins[#admins + 1] = v
                 end
             end
+        else
+            admins[#admins + 1] = ply
         end
+
+        --  no one to send data
+        if #admins == 0 then return end
 
         --  send
         net.Start( "vkx_entspawner:network" )
@@ -501,7 +511,17 @@ else
                 net.WriteUInt( spawner.radius, vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
                 net.WriteBool( spawner.radius_disappear )
             end
-        net.Send( ply or admins )
+        net.Send( admins )
+
+        --  debug
+        if vkx_entspawner.is_debug() then
+            local names = ""
+            for i, v in ipairs( admins ) do
+                names = names .. ( i == 1 and "" or ", " ) .. v:GetName()
+            end
+
+            vkx_entspawner.debug_print( "sent %d spawners to %s", spawners_count, names )
+        end
     end
 
     function vkx_entspawner.safe_network_spawners( ply )
