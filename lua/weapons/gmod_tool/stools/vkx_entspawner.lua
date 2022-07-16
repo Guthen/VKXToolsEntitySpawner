@@ -5,6 +5,13 @@ TOOL.model = "models/editor/playerstart.mdl"
 
 TOOL.should_refresh_preview = true
 
+--  these convars will be ignored by vkx_presets
+TOOL.ClientConVar = {
+    stg = 0,
+    stg_top_offset = 80,
+    stg_bottom_offset = 150,
+}
+
 local convars = {}
 local min_dist = 32
 local min_dist_sqr = min_dist ^ 2
@@ -253,12 +260,40 @@ elseif CLIENT then
 
         local ang = Angle( 0, ( LocalPlayer():GetPos() - pos ):Angle().y, 0 )
         for i, v in ipairs( self.locations ) do
+            self.preview_locations[i] = self.preview_locations[i] or {}
+
             --  rotate position
             local rotated_pos = Vector( v.pos:Unpack() )
             rotated_pos:Rotate( ang )
+                        
+            --  snap on floor w/ raycast
+            if self:GetClientNumber( "stg" ) == 1 then
+                --  trace line
+                local origin = pos + rotated_pos
+                local start_pos = origin + Vector( 0, 0, self:GetClientNumber( "stg_top_offset" ) )
+                local end_pos = origin - Vector( 0, 0, self:GetClientNumber( "stg_bottom_offset" ) )
+                local tr = util.TraceLine( {
+                    start = start_pos,
+                    endpos = end_pos,
+                } )
 
-            --  compute final position and angle
-            self.preview_locations[i] = self.preview_locations[i] or {}
+                --  debug raycast
+                if vkx_entspawner.is_debug() then
+                    debugoverlay.Axis( start_pos, Angle(), 3, FrameTime(), false )
+                    debugoverlay.Line( end_pos, start_pos, FrameTime(), color_white, false )
+                end
+
+                if tr.Hit then
+                    if vkx_entspawner.is_debug() then
+                        debugoverlay.Axis( tr.HitPos, tr.HitNormal:Angle(), 10, FrameTime(), false )
+                    end
+
+                    --  apply relative pos
+                    rotated_pos.z = tr.HitPos.z - pos.z
+                end
+            end
+
+            --  update pos & angle
             self.preview_locations[i].pos = pos + rotated_pos
             self.preview_locations[i].ang = ang + v.ang
         end
@@ -382,6 +417,23 @@ elseif CLIENT then
             preset_control:SetCategory( "vkx_entspawner" )
             panel.Items[#panel.Items + 1] = preset_control --  needed to be cleared
         end
+
+        ---   tool
+        local tool_form = vgui.Create( "DForm" )
+        tool_form:SetName( "Tool" )
+        panel:AddItem( tool_form )
+
+        --  snap-to-ground
+        local stg_form = vgui.Create( "DForm" )
+        stg_form:SetName( "Snap-To-Ground" )
+        tool_form:AddItem( stg_form )
+        
+        local label = stg_form:ControlHelp( "This option will automatically snap each spawn locations to the ground according to an height range. Set convar `vkx_entspawner_debug 1` to get a visual representation of this option." )
+        label:DockMargin( 8, 4, 8, 4 )
+        
+        stg_form:CheckBox( "Enabled", "vkx_entspawner_stg" )
+        stg_form:NumSlider( "Top-Offset", "vkx_entspawner_stg_top_offset", 0, 1000, 0 )
+        stg_form:NumSlider( "Bottom-Offset", "vkx_entspawner_stg_bottom_offset", 0, 1000, 0 )
 
         ---   shape
         local shape_form = vgui.Create( "DForm" )
@@ -662,6 +714,7 @@ end
 local template = vkx_presets and vkx_presets.new_template( "vkx_entspawner" )
 local function add_convar( k, v, template_type, template_options )
     TOOL.ClientConVar[k] = v
+    convars[TOOL:GetMode() .. "_" .. k] = v
     if CLIENT then
         cvars.AddChangeCallback( TOOL.Mode .. "_" .. k, vkx_entspawner.refresh_tool_preview, "VKXTool" )
         vkx_entspawner.print( "Register %q (default: %q)", TOOL.Mode .. "_" .. k, v )
@@ -700,5 +753,3 @@ if template then
     template:build_default_preset()
     vkx_entspawner.template = template
 end
-
-convars = TOOL:BuildConVarList()
