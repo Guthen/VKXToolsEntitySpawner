@@ -362,20 +362,6 @@ else
     concommand.Add( "vkx_entspawner_load_spawners", vkx_entspawner.load_perma_spawners )
 
     --[[ 
-        @function vkx_entspawner.new_spawner
-            | description: Register a new spawner, network it and save it if 'perma' is true
-            | params:
-                spawner: table Spawner to register
-                    | params:
-                        locations: table[@Location] List of locations (position and angles) where entities will spawn
-                        entities: table[@EntityChance] List of spawnable entities 
-                        max: int Number of maximum entities per location
-                        delay: float Time needed between each spawn
-                        perma: bool? Is a Permanent Spawner, if so, the spawner will be saved
-                        radius: int? Player Presence Radius, allow the spawner to run if a Player is in the radius 
-                        radius_disappear: (bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
-            | return: @EntitySpawner spawner
-        
         @structure Location
             | description: Represents a position and an angle
             | params:
@@ -400,6 +386,12 @@ else
                 last_time: float Last time the spawner was runned, use of CurTime
                 radius: int Player Presence Radius, allow the spawner to run if a Player is in the radius 
                 radius_disappear: bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
+
+        @function vkx_entspawner.new_spawner
+            | description: Register a new spawner, network it and save it if 'perma' is true
+            | params:
+                spawner: @EntitySpawner Spawner to register
+            | return: @EntitySpawner spawner
     ]]
     function vkx_entspawner.new_spawner( spawner, nosave )
         --  round percent
