@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.5.1"
+vkx_entspawner.version = "2.6.0"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -94,6 +94,7 @@ if CLIENT then
         for i = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNERS_BITS ) do
             local spawner = {}
             spawner.perma = net.ReadBool( spawner.perma )
+            spawner.oneshot = net.ReadBool()
             
             --  locations
             spawner.locations = {}
@@ -383,6 +384,8 @@ else
                 max: int Number of maximum entities per location
                 delay: float Time needed between each spawn
                 perma: bool? Is a Permanent Spawner, if so, the spawner will be saved
+                oneshot: bool? Is a One-Shot Spawner, if so, the spawner will only run 'max' times and won't trigger again until map reload
+                run_times: int? Number of times the spawner runned, used by 'oneshot' 
                 last_time: float Last time the spawner was runned, use of CurTime
                 radius: int Player Presence Radius, allow the spawner to run if a Player is in the radius 
                 radius_disappear: bool? In addition to PPR, will disappear spawned entities if no Player is in the radius
@@ -488,6 +491,7 @@ else
             net.WriteUInt( spawners_count, vkx_entspawner.NET_SPAWNERS_BITS )
             for i, spawner in pairs( vkx_entspawner.spawners ) do
                 net.WriteBool( spawner.perma )
+                net.WriteBool( spawner.oneshot )
                 
                 --  locations
                 net.WriteUInt( #spawner.locations, vkx_entspawner.NET_LOCATIONS_BITS )
@@ -539,19 +543,33 @@ else
         if player.GetCount() <= 0 then return end
 
         for i, spawner in pairs( vkx_entspawner.spawners ) do
+            --  check delay
             if CurTime() - spawner.last_time < spawner.delay then continue end
 
-            --  run spawner
+            --  call hook
             local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
             if not ( should_run == false ) then
+                --  run spawner
                 vkx_entspawner.run_spawner( spawner, function( obj, type )
                     local list = cleanup.GetList()
                     list[fake_cleanup_id] = list[fake_cleanup_id] or {}
                     list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
                     list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
                 end )
+
+                --  increase run times
+                spawner.run_times = ( spawner.run_times or 0 ) + 1
+                
+                --  delay next run
                 spawner.last_time = CurTime()
             end
+        end
+    end )
+
+    hook.Add( "vkx_entspawner:should_spawner_run", "vkx_entspawner:one_shot", function( spawner )
+        --  one-shot
+        if spawner.oneshot and ( spawner.run_times or 0 ) >= spawner.max then 
+            return false 
         end
     end )
 

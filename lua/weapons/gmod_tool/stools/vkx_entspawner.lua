@@ -50,6 +50,7 @@ function TOOL:LeftClick( tr )
         net.WriteBool( is_spawner )
         if is_spawner then
             net.WriteBool( self:GetClientNumber( "is_perma", 0 ) )
+            net.WriteBool( self:GetClientNumber( "is_oneshot", 0 ) )
             net.WriteUInt( self:GetClientNumber( "spawner_max", 1 ), vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
             net.WriteUInt( self:GetClientNumber( "spawner_delay", 3 ), vkx_entspawner.NET_SPAWNER_DELAY_BITS )
             net.WriteUInt( self:GetClientNumber( "spawner_radius", 0 ), vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
@@ -110,6 +111,7 @@ function TOOL:Reload( tr )
                 end
                 GetConVar( "vkx_entspawner_is_spawner" ):SetBool( true )
                 GetConVar( "vkx_entspawner_is_perma" ):SetBool( spawner.perma )
+                GetConVar( "vkx_entspawner_is_oneshot" ):SetBool( spawner.oneshot )
                 GetConVar( "vkx_entspawner_spawner_max" ):SetInt( spawner.max )
                 GetConVar( "vkx_entspawner_spawner_delay" ):SetInt( spawner.delay )
                 GetConVar( "vkx_entspawner_spawner_radius" ):SetInt( spawner.radius )
@@ -176,6 +178,7 @@ if SERVER then
         local is_spawner, is_perma, spawner_max, spawner_delay, spawner_radius, spawner_radius_disappear = net.ReadBool()
         if is_spawner then
             is_perma = net.ReadBool()
+            local is_oneshot = net.ReadBool()
             spawner_max = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
             spawner_delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
             spawner_radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
@@ -187,6 +190,7 @@ if SERVER then
                 max = spawner_max,
                 delay = spawner_delay,
                 perma = is_perma,
+                oneshot = is_oneshot,
                 radius = spawner_radius,
                 radius_disappear = spawner_radius_disappear,
             } )
@@ -625,6 +629,10 @@ elseif CLIENT then
         perma_check = spawner_form:CheckBox( "Is Perma", "vkx_entspawner_is_perma" )
         spawner_form:ControlHelp( "If checked, the created Entities spawners will be saved and loaded on server start. Note that red sphere spawners represent perma spawners and green are non-perma spawners." )
         
+        --  one shot
+        spawner_form:CheckBox( "Is One-Shot", "vkx_entspawner_is_oneshot" )
+        spawner_form:ControlHelp( "If checked, the spawner will run once (depending on the amount of 'Max Entities') and will never trigger again until map reload." )
+
         --  max
         local options = vkx_entspawner.template:get( "spawner_max" ):get_options()
         max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", options.min, options.max, 0 )
@@ -736,6 +744,7 @@ add_convar( "shape", "None", "Combo", { values = values } )
 
 --  others
 add_convar( "is_spawner", "0", "Boolean" )
+add_convar( "is_oneshot", "0", "Boolean" )
 add_convar( "is_perma", "0", "Boolean" )
 add_convar( "spawner_max", "1", "Int", { min = 1, max = 16 } )
 add_convar( "spawner_delay", "3", "Int", { min = 1, max = 120 } )
