@@ -93,7 +93,7 @@ if CLIENT then
 
         for i = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNERS_BITS ) do
             local spawner = {}
-            spawner.perma = net.ReadBool( spawner.perma )
+            spawner.perma = net.ReadBool()
             spawner.oneshot = net.ReadBool()
             
             --  locations

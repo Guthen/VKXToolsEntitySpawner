@@ -175,14 +175,14 @@ if SERVER then
         end
 
         --  spawner
-        local is_spawner, is_perma, spawner_max, spawner_delay, spawner_radius, spawner_radius_disappear = net.ReadBool()
+        local is_spawner = net.ReadBool()
         if is_spawner then
-            is_perma = net.ReadBool()
+            local is_perma = net.ReadBool()
             local is_oneshot = net.ReadBool()
-            spawner_max = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
-            spawner_delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
-            spawner_radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
-            spawner_radius_disappear = net.ReadBool()
+            local spawner_max = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+            local spawner_delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
+            local spawner_radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
+            local spawner_radius_disappear = net.ReadBool()
 
             local spawner = vkx_entspawner.new_spawner( {
                 locations = locations,
@@ -617,7 +617,7 @@ elseif CLIENT then
         spawner_form:SetName( "Spawner" )
         panel:AddItem( spawner_form )
         
-        local spawner_check, perma_check, max_slider, delay_slider, radius_slider = spawner_form:CheckBox( "Is Spawner", "vkx_entspawner_is_spawner" )
+        local spawner_check = spawner_form:CheckBox( "Is Spawner", "vkx_entspawner_is_spawner" )
         spawner_form:ControlHelp( "If checked, this tool will creates Entities Spawners instead of direct Entities." )
         function spawner_check:OnChange( value )
             for i, v in ipairs( spawner_form.Items ) do
@@ -626,7 +626,7 @@ elseif CLIENT then
         end
         
         --  perma
-        perma_check = spawner_form:CheckBox( "Is Perma", "vkx_entspawner_is_perma" )
+        local perma_check = spawner_form:CheckBox( "Is Perma", "vkx_entspawner_is_perma" )
         spawner_form:ControlHelp( "If checked, the created Entities spawners will be saved and loaded on server start. Note that red sphere spawners represent perma spawners and green are non-perma spawners." )
         
         --  one shot
@@ -635,21 +635,21 @@ elseif CLIENT then
 
         --  max
         local options = vkx_entspawner.template:get( "spawner_max" ):get_options()
-        max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", options.min, options.max, 0 )
+        local max_slider = spawner_form:NumSlider( "Max Entities", "vkx_entspawner_spawner_max", options.min, options.max, 0 )
         spawner_form:ControlHelp( "How many Entities can spawn for each spawner/location?" )
         
         --  delay
         local options = vkx_entspawner.template:get( "spawner_delay" ):get_options()
-        delay_slider = spawner_form:NumSlider( "Spawn Delay", "vkx_entspawner_spawner_delay", options.min, options.max, 0 )
+        local delay_slider = spawner_form:NumSlider( "Spawn Delay", "vkx_entspawner_spawner_delay", options.min, options.max, 0 )
         spawner_form:ControlHelp( "How many seconds should the spawner wait between each spawn?" )
         
         --  radius
         local options = vkx_entspawner.template:get( "spawner_radius" ):get_options()
-        radius_slider = spawner_form:NumSlider( "Player Spawn Radius", "vkx_entspawner_spawner_radius", options.min, options.max, 0 )
+        local radius_slider = spawner_form:NumSlider( "Player Spawn Radius", "vkx_entspawner_spawner_radius", options.min, options.max, 0 )
         spawner_form:ControlHelp( "If set above 0, the radius will define the area whenever the spawner will start to spawn entities depending of player presence. If a player is in the radius, the spawner will start spawning." )
         
         --  radius disappear
-        radius_disappear_check = spawner_form:CheckBox( "Player Disappear Radius", "vkx_entspawner_spawner_radius_disappear" )
+        local radius_disappear_check = spawner_form:CheckBox( "Player Disappear Radius", "vkx_entspawner_spawner_radius_disappear" )
         spawner_form:ControlHelp( "If checked, when no player is within the radius, spawned entities will automatically disappear." )
         
         spawner_check:OnChange( spawner_check:GetChecked() )
