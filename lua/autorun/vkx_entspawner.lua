@@ -539,18 +539,18 @@ else
         if player.GetCount() <= 0 then return end
 
         for i, spawner in pairs( vkx_entspawner.spawners ) do
-            if CurTime() - spawner.last_time >= spawner.delay then
-                --  run spawner
-                local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
-                if not ( should_run == false ) then
-                    vkx_entspawner.run_spawner( spawner, function( obj, type )
-                        local list = cleanup.GetList()
-                        list[fake_cleanup_id] = list[fake_cleanup_id] or {}
-                        list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
-                        list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
-                    end )
-                    spawner.last_time = CurTime()
-                end
+            if CurTime() - spawner.last_time < spawner.delay then continue end
+
+            --  run spawner
+            local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
+            if not ( should_run == false ) then
+                vkx_entspawner.run_spawner( spawner, function( obj, type )
+                    local list = cleanup.GetList()
+                    list[fake_cleanup_id] = list[fake_cleanup_id] or {}
+                    list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
+                    list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
+                end )
+                spawner.last_time = CurTime()
             end
         end
     end )
