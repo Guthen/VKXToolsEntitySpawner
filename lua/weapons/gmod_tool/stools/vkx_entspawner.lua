@@ -388,7 +388,7 @@ elseif CLIENT then
                     local color = spawner.perma and perma_color or non_perma_color
                     local pos = v.pos:ToScreen()
                     
-                    draw.SimpleText( spawner.delay .. "s ─ " .. spawner.max .. " max", "Default", pos.x, pos.y, color )
+                    draw.SimpleText( spawner.delay .. "s ─ " .. spawner.max .. " max" .. ( spawner.oneshot and " ─ one-shot" or "" ), "Default", pos.x, pos.y, color )
                     for i, ent in ipairs( spawner.entities ) do
                         draw.SimpleText( ent.key .. " (" .. ent.percent * 100 .. "%)", "Default", pos.x, pos.y + 15 * i, color )
                     end
