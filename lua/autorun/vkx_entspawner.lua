@@ -1,14 +1,16 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.2"
+vkx_entspawner.version = "2.6.3"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
     ["keyframe_rope"] = true,
+    ["move_rope"] = true,
     ["trigger_multiple"] = true,
     ["trigger_once"] = true,
 
     ["physgun_beam"] = true,
     ["predicted_viewmodel"] = true,
+
 }
 
 --  network limitations
