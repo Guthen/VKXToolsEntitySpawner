@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.3"
+vkx_entspawner.version = "2.6.4"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -147,6 +147,14 @@ else
         end
     end )
 
+    --  using `list.GetForEdit` so we use the pointer to the list instead of a copy (allowing further changes to lists)
+    local cached_lists = {
+        Weapon = list.GetForEdit( "Weapon" ),
+        NPC = list.GetForEdit( "NPC" ),
+        SpawnableEntities = list.GetForEdit( "SpawnableEntities" ),
+        Vehicles = list.GetForEdit( "Vehicles" ),
+        simfphys_vehicles = list.GetForEdit( "simfphys_vehicles" ),
+    }
     function vkx_entspawner.spawn_object( key, pos, ang )
         if not key or not pos or not ang then return end
 
@@ -154,18 +162,18 @@ else
         entities_spawnlist = {}
 
         local obj, cat
-        if list.Get( "Weapon" )[key] then
+        if cached_lists.Weapon[key] then
             obj, cat = vkx_entspawner.spawn_weapon( key, pos, ang )
-        elseif list.Get( "NPC" )[key] then
+        elseif cached_lists.NPC[key] then
             obj, cat = vkx_entspawner.spawn_npc( key, pos, ang )
         elseif scripted_ents.GetStored( key ) then
             obj, cat = vkx_entspawner.spawn_sent( key, pos, ang )
-        elseif list.Get( "SpawnableEntities" )[key] then
+        elseif cached_lists.SpawnableEntities[key] then
             obj, cat = vkx_entspawner.spawn_entity( key, pos, ang )
-        elseif list.Get( "Vehicles" )[key] then
+        elseif cached_lists.Vehicles[key] then
             obj, cat = vkx_entspawner.spawn_vehicle( key, pos, ang )
-        elseif simfphys and list.Get( "simfphys_vehicles" )[key] then
-            local vehicle = list.Get( "simfphys_vehicles" )[key]
+        elseif simfphys and cached_lists.simfphys_vehicles[key] then
+            local vehicle = cached_lists.simfphys_vehicles[key]
             if vehicle.SpawnOffset then 
                 pos = pos + vehicle.SpawnOffset 
             end
@@ -180,7 +188,7 @@ else
     end
 
     function vkx_entspawner.spawn_vehicle( key, pos, ang )
-        local vehicle = list.Get( "Vehicles" )[key]
+        local vehicle = cached_lists.Vehicles[key]
         if not vehicle then 
             return vkx_entspawner.print( "Try to spawn a Vehicle %q which doesn't exists!", key )
         end
@@ -229,7 +237,7 @@ else
     end
 
     function vkx_entspawner.spawn_entity( key, pos, ang )
-        local entity = list.Get( "SpawnableEntities" )[key]
+        local entity = cached_lists.SpawnableEntities[key]
         if not entity then
             return vkx_entspawner.print( "Try to spawn an Entity %q which doesn't exists!", key )
         end
@@ -246,7 +254,7 @@ else
     end
 
     function vkx_entspawner.spawn_weapon( key, pos, ang )
-        local weapon = list.Get( "Weapon" )[key]
+        local weapon = cached_lists.Weapon[key]
         if not weapon then
             return vkx_entspawner.print( "Try to spawn a Weapon %q which doesn't exists!", key )
         end
@@ -263,7 +271,7 @@ else
     end
 
     function vkx_entspawner.spawn_npc( key, pos, ang )
-        local npc = list.Get( "NPC" )[key]
+        local npc = cached_lists.NPC[key]
         if not npc then 
             return vkx_entspawner.print( "Try to spawn a NPC %q which doesn't exists!", key )
         end
