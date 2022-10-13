@@ -35,13 +35,13 @@ function TOOL:LeftClick( tr )
     local is_spawner = tobool( self:GetClientNumber( "is_spawner", 0 ) )
     net.Start( "vkx_entspawner:spawn" )
         --  locations
-        net.WriteUInt( #self.preview_locations, vkx_entspawner.NET_LOCATIONS_BITS )
+        net.WriteUInt( #self.preview_locations, vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS )
         for i, v in ipairs( self.preview_locations ) do
             net.WriteVector( v.pos )
             net.WriteAngle( v.ang )
         end
         --  entities chance
-        net.WriteUInt( #vkx_entspawner.ents_chance, vkx_entspawner.NET_ENTS_CHANCE_BITS )
+        net.WriteUInt( #vkx_entspawner.ents_chance, vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS )
         for i, v in ipairs( vkx_entspawner.ents_chance ) do
             net.WriteString( v.key )
             net.WriteFloat( v.percent )
@@ -135,7 +135,7 @@ if SERVER then
         if last_times[ply] and CurTime() - last_times[ply] <= .1 then return vkx_entspawner.debug_print( "%q is spamming, aborting request", ply:GetName() ) end --  avoid unwanted spam
         
         --  locations
-        local locations_count = net.ReadUInt( vkx_entspawner.NET_LOCATIONS_BITS )
+        local locations_count = net.ReadUInt( vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS )
         if locations_count == 0 then 
             return vkx_entspawner.debug_print( "failed to receive the length of the locations from %q", ply:GetName() ) 
         end
@@ -155,7 +155,7 @@ if SERVER then
         end
 
         --  chances
-        local chances_count = net.ReadUInt( vkx_entspawner.NET_ENTS_CHANCE_BITS )
+        local chances_count = net.ReadUInt( vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS )
         if chances_count == 0 then 
             return vkx_entspawner.debug_print( "failed to receive the length of the entities chance from %q", ply:GetName() ) 
         end

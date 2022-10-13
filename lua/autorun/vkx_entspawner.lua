@@ -10,12 +10,11 @@ vkx_entspawner.blocking_entity_blacklist = {
 
     ["physgun_beam"] = true,
     ["predicted_viewmodel"] = true,
-
 }
 
 --  network limitations
-vkx_entspawner.NET_LOCATIONS_BITS = 10 --  default: 10 (unsigned) bytes which allows 1023 different locations
-vkx_entspawner.NET_ENTS_CHANCE_BITS = 5 --  default: 5 (unsigned) bytes which allows 31 different entities
+vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS = 10 --  default: 10 (unsigned) bytes which allows 1023 different locations
+vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS = 5 --  default: 5 (unsigned) bytes which allows 31 different entities
 vkx_entspawner.NET_SPAWNERS_BITS = 16 --  default: 16 (unsigned) bytes which allows 65535 different spawners
 vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS = 8 --  default: 8 (unsigned) bytes which allows networking up to 255 values
 vkx_entspawner.NET_SPAWNER_DELAY_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 seconds (18 hours)
@@ -101,7 +100,7 @@ if CLIENT then
             
             --  locations
             spawner.locations = {}
-            for k = 1, net.ReadUInt( vkx_entspawner.NET_LOCATIONS_BITS ) do
+            for k = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS ) do
                 spawner.locations[k] = {
                     pos = net.ReadVector(),
                     ang = net.ReadAngle(),
@@ -110,7 +109,7 @@ if CLIENT then
 
             --  entities chance
             spawner.entities = {}
-            for k = 1, net.ReadUInt( vkx_entspawner.NET_ENTS_CHANCE_BITS ) do
+            for k = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS ) do
                 spawner.entities[k] = {
                     key = net.ReadString(),
                     percent = math.Round( net.ReadFloat(), 2 ),
@@ -529,14 +528,14 @@ else
                 net.WriteBool( spawner.oneshot )
                 
                 --  locations
-                net.WriteUInt( #spawner.locations, vkx_entspawner.NET_LOCATIONS_BITS )
+                net.WriteUInt( #spawner.locations, vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS )
                 for i, v in ipairs( spawner.locations ) do
                     net.WriteVector( v.pos )
                     net.WriteAngle( v.ang )
                 end
 
                 --  entities chance
-                net.WriteUInt( #spawner.entities, vkx_entspawner.NET_ENTS_CHANCE_BITS )
+                net.WriteUInt( #spawner.entities, vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS )
                 for i, v in ipairs( spawner.entities ) do
                     net.WriteString( v.key )
                     net.WriteFloat( v.percent )
