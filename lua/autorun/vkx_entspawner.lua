@@ -432,6 +432,7 @@ else
 
         --  add spawner
         spawner.last_time = spawner.last_time or CurTime()
+        spawner.run_times = spawner.run_times or 0
         spawner.radius = spawner.radius or 0
         spawner.id = spawner.id or #vkx_entspawner.spawners + 1
         vkx_entspawner.spawners[spawner.id] = spawner
