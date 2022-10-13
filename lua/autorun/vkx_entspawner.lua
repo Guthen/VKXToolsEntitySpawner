@@ -13,6 +13,7 @@ vkx_entspawner.blocking_entity_blacklist = {
 }
 
 --  network limitations
+vkx_entspawner.NET_SPAWNER_ID_BITS = 8 --  default: 8 (unsigned) bytes which allows 255 different locations
 vkx_entspawner.NET_SPAWNER_LOCATIONS_BITS = 10 --  default: 10 (unsigned) bytes which allows 1023 different locations
 vkx_entspawner.NET_SPAWNER_ENTS_CHANCE_BITS = 5 --  default: 5 (unsigned) bytes which allows 31 different entities
 vkx_entspawner.NET_SPAWNERS_BITS = 16 --  default: 16 (unsigned) bytes which allows 65535 different spawners
@@ -95,6 +96,7 @@ if CLIENT then
 
         for i = 1, net.ReadUInt( vkx_entspawner.NET_SPAWNERS_BITS ) do
             local spawner = {}
+            spawner.id = net.ReadUInt( vkx_entspawner.NET_SPAWNER_ID_BITS )
             spawner.perma = net.ReadBool()
             spawner.oneshot = net.ReadBool()
             
@@ -123,7 +125,7 @@ if CLIENT then
             spawner.last_time = net.ReadFloat()
             spawner.run_times = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS )
 
-            spawners[i] = spawner
+            spawners[spawner.id] = spawner
         end
 
         vkx_entspawner.spawners = spawners
@@ -524,6 +526,7 @@ else
         net.Start( "vkx_entspawner:network" )
             net.WriteUInt( spawners_count, vkx_entspawner.NET_SPAWNERS_BITS )
             for i, spawner in pairs( vkx_entspawner.spawners ) do
+                net.WriteUInt( spawner.id, vkx_entspawner.NET_SPAWNER_ID_BITS )
                 net.WriteBool( spawner.perma )
                 net.WriteBool( spawner.oneshot )
                 
