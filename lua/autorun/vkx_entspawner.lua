@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.4"
+vkx_entspawner.version = "2.6.5"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -380,6 +380,7 @@ else
             | params:
                 pos: Vector
                 ang: Angle
+                entities: table[Entity] server only; list of spawned entities for this location
         
         @structure EntityChance
             | description: Represents an entity class and his percent chance of getting it
@@ -481,21 +482,23 @@ else
 
     --  network spawners
     util.AddNetworkString( "vkx_entspawner:network" )
+
+    local convar_network_admin_only = CreateConVar( "vkx_entspawner_network_superadmin_only", 1, { FCVAR_ARCHIVE, FCVAR_LUA_SERVER }, "Should the spawners be networked to superadmin only or be available for other players?", 0, 1 )
     function vkx_entspawner.network_spawners( ply )
-        --  get admins
-        local admins = {}
+        --  get users
+        local users = {}
         if not ply then
             for i, v in ipairs( player.GetAll() ) do
-                if v:IsSuperAdmin() then
-                    admins[#admins + 1] = v
-                end
+                if convar_network_admin_only:GetBool() and not v:IsSuperAdmin() then continue end
+                
+                users[#users + 1] = v
             end
         else
-            admins[#admins + 1] = ply
+            users[#users + 1] = ply
         end
 
         --  no one to send data
-        if #admins == 0 then return end
+        if #users == 0 then return end
 
         --  send
         local spawners_count = table.Count( vkx_entspawner.spawners )
@@ -524,12 +527,12 @@ else
                 net.WriteUInt( spawner.radius, vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
                 net.WriteBool( spawner.radius_disappear )
             end
-        net.Send( admins )
+        net.Send( users )
 
         --  debug
         if vkx_entspawner.is_debug() then
             local names = ""
-            for i, v in ipairs( admins ) do
+            for i, v in ipairs( users ) do
                 names = names .. ( i == 1 and "" or ", " ) .. v:GetName()
             end
 
@@ -544,7 +547,7 @@ else
     end
 
     net.Receive( "vkx_entspawner:network", function( len, ply )
-        if not ply:IsSuperAdmin() then return end
+        if convar_network_admin_only:GetBool() and not ply:IsSuperAdmin() then return end
 
         vkx_entspawner.network_spawners( ply )
     end )
