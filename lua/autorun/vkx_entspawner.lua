@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.6"
+vkx_entspawner.version = "2.6.7"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -450,6 +450,7 @@ else
     end
 
     function vkx_entspawner.run_spawner( spawner, callback, err_callback )
+        local count = 0
         for i, v in ipairs( spawner.locations ) do
             --  limit?
             v.entities = v.entities or {}
@@ -462,18 +463,31 @@ else
             --  spawn
             if #v.entities < spawner.max then
                 for i, chance in ipairs( spawner.entities ) do
-                    if math.random() <= chance.percent then 
+                    if math.random() <= chance.percent then
+                        --  spawn entity
                         local obj, type = vkx_entspawner.spawn_object( chance.key, v.pos, v.ang )
                         if IsValid( obj ) then
+                            --  check is safe
                             local can_spawn, blocking_entity = vkx_entspawner.can_spawn_safely( obj )
                             if not can_spawn then
-                                if err_callback then err_callback( "cant_spawn", obj, blocking_entity ) end
+                                --  error callback
+                                if err_callback then 
+                                    err_callback( "cant_spawn", obj, blocking_entity ) 
+                                end
+
+                                --  remove
                                 obj:Remove()
                                 break
                             end
 
-                            if callback then callback( obj, type ) end
+                            --  success callback
+                            if callback then 
+                                callback( obj, type ) 
+                            end
+
+                            --  register
                             v.entities[#v.entities + 1] = obj
+                            count = count + 1
                         end
 
                         break
@@ -481,6 +495,8 @@ else
                 end
             end
         end
+
+        return count
     end
 
     --  network spawners
@@ -571,18 +587,21 @@ else
             local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
             if not ( should_run == false ) then
                 --  run spawner
-                vkx_entspawner.run_spawner( spawner, function( obj, type )
+                local spawned_count = vkx_entspawner.run_spawner( spawner, function( obj, type )
                     local list = cleanup.GetList()
                     list[fake_cleanup_id] = list[fake_cleanup_id] or {}
                     list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
                     list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
                 end )
 
-                --  increase run times
-                spawner.run_times = ( spawner.run_times or 0 ) + 1
-                
-                --  delay next run
-                spawner.last_time = CurTime()
+                --  check for new entities
+                if spawned_count > 0 then
+                    --  increase run times
+                    spawner.run_times = ( spawner.run_times or 0 ) + 1
+                    
+                    --  delay next run
+                    spawner.last_time = CurTime()
+                end
             end
         end
     end )
