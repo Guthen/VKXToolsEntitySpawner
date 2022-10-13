@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.5"
+vkx_entspawner.version = "2.6.6"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -20,6 +20,7 @@ vkx_entspawner.NET_SPAWNERS_BITS = 16 --  default: 16 (unsigned) bytes which all
 vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS = 8 --  default: 8 (unsigned) bytes which allows networking up to 255 values
 vkx_entspawner.NET_SPAWNER_DELAY_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 seconds (18 hours)
 vkx_entspawner.NET_SPAWNER_RADIUS_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 units
+vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS = 16 --  default: 16 (unsigned) bytes which allows networking up to 65535 values
 
 function vkx_entspawner.print( msg, ... )
     if #{ ... } > 0 then
@@ -120,6 +121,8 @@ if CLIENT then
             spawner.delay = net.ReadUInt( vkx_entspawner.NET_SPAWNER_DELAY_BITS )
             spawner.radius = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
             spawner.radius_disappear = net.ReadBool()
+            spawner.last_time = net.ReadFloat()
+            spawner.run_times = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS )
 
             spawners[i] = spawner
         end
@@ -482,6 +485,7 @@ else
 
     --  network spawners
     util.AddNetworkString( "vkx_entspawner:network" )
+    util.AddNetworkString( "vkx_entspawner:run" )
 
     local convar_network_admin_only = CreateConVar( "vkx_entspawner_network_superadmin_only", 1, { FCVAR_ARCHIVE, FCVAR_LUA_SERVER }, "Should the spawners be networked to superadmin only or be available for other players?", 0, 1 )
     function vkx_entspawner.network_spawners( ply )
@@ -526,6 +530,8 @@ else
                 net.WriteUInt( spawner.delay, vkx_entspawner.NET_SPAWNER_DELAY_BITS )
                 net.WriteUInt( spawner.radius, vkx_entspawner.NET_SPAWNER_RADIUS_BITS )
                 net.WriteBool( spawner.radius_disappear )
+                net.WriteFloat( spawner.last_time )
+                net.WriteUInt( spawner.run_times, vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS )
             end
         net.Send( users )
 
