@@ -157,6 +157,9 @@ if CLIENT then
             end
         end
 
+        --  call hook
+        hook.Run( "vkx_entspawner:on_spawner_run", spawner )
+
         vkx_entspawner.debug_print( "received spawner %d run (%s bits/%s)", id, len, string.NiceSize( len / 8 ) )
     end )
 
@@ -544,6 +547,9 @@ else
             
             --  delay next run
             spawner.last_time = CurTime()
+
+            --  call hook
+            hook.Run( "vkx_entspawner:on_spawner_run", spawner )
 
             --  network
             if convar_network_run:GetBool() then
