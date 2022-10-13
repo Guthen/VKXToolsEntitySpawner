@@ -1,5 +1,5 @@
 vkx_entspawner = vkx_entspawner or {}
-vkx_entspawner.version = "2.6.7"
+vkx_entspawner.version = "2.7.0"
 vkx_entspawner.save_path = "vkx_tools/entspawners/%s.json"
 vkx_entspawner.spawners = vkx_entspawner.spawners or {}
 vkx_entspawner.blocking_entity_blacklist = {
@@ -106,6 +106,7 @@ if CLIENT then
                 spawner.locations[k] = {
                     pos = net.ReadVector(),
                     ang = net.ReadAngle(),
+                    entities = {},
                 }
             end
 
@@ -129,7 +130,34 @@ if CLIENT then
         end
 
         vkx_entspawner.spawners = spawners
-        vkx_entspawner.debug_print( "received %d spawners (%s)", #spawners, string.NiceSize( len / 8 ) )
+        vkx_entspawner.debug_print( "received %d spawners (%s bits/%s)", #spawners, len, string.NiceSize( len / 8 ) )
+    end )
+
+    net.Receive( "vkx_entspawner:run", function( len )
+        local id = net.ReadUInt( vkx_entspawner.NET_SPAWNER_ID_BITS )
+
+        --  find spawner
+        local spawner = vkx_entspawner.spawners[id]
+        if not spawner then
+            vkx_entspawner.debug_print( "couldn't receive spawner %d run (%s bits/%s): not found!", id, len, string.NiceSize( len / 8 ) )
+            return
+        end
+
+        --  set values
+        spawner.last_time = net.ReadFloat()
+        spawner.run_times = net.ReadUInt( vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS )
+
+        --  read active entities
+        for i, v in ipairs( spawner.locations ) do
+            local count = net.ReadUInt( vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+
+            v.entities = {}
+            for i = 1, count do
+                v.entities[i] = net.ReadEntity()
+            end
+        end
+
+        vkx_entspawner.debug_print( "received spawner %d run (%s bits/%s)", id, len, string.NiceSize( len / 8 ) )
     end )
 
     local function retrieve_spawners()
@@ -144,6 +172,11 @@ if CLIENT then
         notification.AddLegacy( net.ReadString(), net.ReadUInt( 3 ), 3 )
     end )
 else
+    --  convars
+    local convar_network_admin_only = CreateConVar( "vkx_entspawner_network_superadmin_only", 1, { FCVAR_ARCHIVE, FCVAR_LUA_SERVER }, "Should the spawners be networked to superadmin only or be available for other players?", 0, 1 )
+    local convar_network_run = CreateConVar( "vkx_entspawner_network_run", 0, { FCVAR_ARCHIVE, FCVAR_LUA_SERVER }, "Should the spawners run-time be networked to allowed users? This option syncs the new spawner properties to clients. Users are defined by 'vkx_entspawner_network_superadmin_only' convar", 0, 1 )
+    
+    --  cache spawned entities
     local is_spawnlist_registering, entities_spawnlist = false, {}
     hook.Add( "OnEntityCreated", "vkx_entspawner:can_spawn_safely", function( ent )
         if is_spawnlist_registering then
@@ -390,7 +423,7 @@ else
             | params:
                 pos: Vector
                 ang: Angle
-                entities: table[Entity] server only; list of spawned entities for this location
+                entities: table[Entity] list of spawned entities for this location
         
         @structure EntityChance
             | description: Represents an entity class and his percent chance of getting it
@@ -458,7 +491,7 @@ else
     end
 
     function vkx_entspawner.run_spawner( spawner, callback, err_callback )
-        local count = 0
+        local spawned_count = 0
         for i, v in ipairs( spawner.locations ) do
             --  limit?
             v.entities = v.entities or {}
@@ -495,7 +528,7 @@ else
 
                             --  register
                             v.entities[#v.entities + 1] = obj
-                            count = count + 1
+                            spawned_count = spawned_count + 1
                         end
 
                         break
@@ -504,29 +537,64 @@ else
             end
         end
 
-        return count
+        --  check for registered spawner and for new entities
+        if vkx_entspawner.spawners[spawner.id] and spawned_count > 0 then
+            --  increase run times
+            spawner.run_times = ( spawner.run_times or 0 ) + 1
+            
+            --  delay next run
+            spawner.last_time = CurTime()
+
+            --  network
+            if convar_network_run:GetBool() then
+                timer.Simple( .1, function()  --  must be defered since entities are not instantanously created on clients
+                    vkx_entspawner.network_run_spawner( spawner )
+                end )
+            end
+        end
+
+        return spawned_count
     end
 
     --  network spawners
     util.AddNetworkString( "vkx_entspawner:network" )
     util.AddNetworkString( "vkx_entspawner:run" )
 
-    local convar_network_admin_only = CreateConVar( "vkx_entspawner_network_superadmin_only", 1, { FCVAR_ARCHIVE, FCVAR_LUA_SERVER }, "Should the spawners be networked to superadmin only or be available for other players?", 0, 1 )
-    function vkx_entspawner.network_spawners( ply )
-        --  get users
+    function vkx_entspawner.get_network_users()
         local users = {}
-        if not ply then
-            for i, v in ipairs( player.GetAll() ) do
-                if convar_network_admin_only:GetBool() and not v:IsSuperAdmin() then continue end
-                
-                users[#users + 1] = v
-            end
-        else
+
+        for i, ply in ipairs( player.GetAll() ) do
+            if convar_network_admin_only:GetBool() and not ply:IsSuperAdmin() then continue end
+            
             users[#users + 1] = ply
         end
 
-        --  no one to send data
-        if #users == 0 then return end
+        return users
+    end
+
+    function vkx_entspawner.concat_players_names( players )
+        local names = ""
+
+        for i, ply in ipairs( players ) do
+            names = names .. ( i == 1 and "" or ", " ) .. ply:GetName()
+        end
+
+        return players
+    end
+    
+    function vkx_entspawner.network_spawners( ply )
+        --  get users
+        local users
+        if not ply then
+            users = vkx_entspawner.get_network_users()
+
+            --  no one to send data
+            if #users == 0 then 
+                return 
+            end
+        else
+            users = { ply }
+        end
 
         --  send
         local spawners_count = table.Count( vkx_entspawner.spawners )
@@ -562,12 +630,7 @@ else
 
         --  debug
         if vkx_entspawner.is_debug() then
-            local names = ""
-            for i, v in ipairs( users ) do
-                names = names .. ( i == 1 and "" or ", " ) .. v:GetName()
-            end
-
-            vkx_entspawner.debug_print( "sent %d spawners to %s", spawners_count, names )
+            vkx_entspawner.debug_print( "sent %d spawners to %s", spawners_count, vkx_entspawner.concat_players_names( users ) )
         end
     end
 
@@ -583,6 +646,32 @@ else
         vkx_entspawner.network_spawners( ply )
     end )
 
+    function vkx_entspawner.network_run_spawner( spawner )
+        --  get users
+        local users = vkx_entspawner.get_network_users()
+        if #users == 0 then 
+            return 
+        end
+
+        --  send
+        net.Start( "vkx_entspawner:run" )
+            net.WriteUInt( spawner.id, vkx_entspawner.NET_SPAWNER_ID_BITS )
+            net.WriteFloat( spawner.last_time )
+            net.WriteUInt( spawner.run_times, vkx_entspawner.NET_SPAWNER_RUN_TIMES_BITS )
+
+            --  send active entities
+            for i, v in ipairs( spawner.locations ) do
+                net.WriteUInt( #v.entities, vkx_entspawner.NET_SPAWNER_MAX_ENTITIES_BITS )
+
+                for i, ent in ipairs( v.entities ) do
+                    if IsValid( ent ) then
+                        net.WriteEntity( ent )
+                    end
+                end
+            end
+        net.Send( users )
+    end
+
     --  spawner time
     local fake_cleanup_id = -1
     timer.Create( "vkx_entspawner:spawner", 1, 0, function()
@@ -596,21 +685,12 @@ else
             local should_run = hook.Run( "vkx_entspawner:should_spawner_run", spawner )
             if not ( should_run == false ) then
                 --  run spawner
-                local spawned_count = vkx_entspawner.run_spawner( spawner, function( obj, type )
+                vkx_entspawner.run_spawner( spawner, function( obj, type )
                     local list = cleanup.GetList()
                     list[fake_cleanup_id] = list[fake_cleanup_id] or {}
                     list[fake_cleanup_id][type] = list[fake_cleanup_id][type] or {}
                     list[fake_cleanup_id][type][#list[fake_cleanup_id][type] + 1] = obj
                 end )
-
-                --  check for new entities
-                if spawned_count > 0 then
-                    --  increase run times
-                    spawner.run_times = ( spawner.run_times or 0 ) + 1
-                    
-                    --  delay next run
-                    spawner.last_time = CurTime()
-                end
             end
         end
     end )

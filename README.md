@@ -34,7 +34,8 @@ It allows you to spawn a lot of entities, see the following list of *compatibles
 Green spawners are non-permanent spawners and red spawners are permanent (saved and loaded on server restart) ones.
 
 ### ConVars
-+ `vkx_entspawner_network_superadmin_only <0 or 1>`: **server**; Should the spawners be networked to superadmin only or be available for other players?
++ `vkx_entspawner_network_superadmin_only <0 or 1>`: **server**; default to `1`; Should the spawners be networked to superadmin only or be available for other players?
++ `vkx_entspawner_network_run <0 or 1>`: **server**; default to `0`; Should the spawners run-time be networked to allowed users? This option syncs the new spawner properties to clients. Users are defined by `vkx_entspawner_network_superadmin_only` convar
 
 ### ❗ Known Issues
 No issues
