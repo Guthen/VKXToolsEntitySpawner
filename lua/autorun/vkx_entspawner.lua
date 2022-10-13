@@ -311,13 +311,19 @@ else
         local pos = ent:GetPos()
         local min, max = ent:GetModelBounds()
         for i, v in ipairs( ents.FindInBox( pos + min, pos + max ) ) do
-            if v == ent then continue end
-            if entities_spawnlist and entities_spawnlist[v] then continue end
+            if v == ent then continue end  --  skip self
+            if entities_spawnlist and entities_spawnlist[v] then continue end  --  skip just spawned entities
+            if vkx_entspawner.blocking_entity_blacklist[v:GetClass()] then continue end  --  skip blacklisted classes
+            if v:GetBrushPlaneCount() > 0 or v:IsWeapon() then continue end  --  skip brushs & weapons
 
-            if not vkx_entspawner.blocking_entity_blacklist[v:GetClass()] and v:GetBrushPlaneCount() == 0 and not v:IsWeapon() then 
-                vkx_entspawner.debug_print( "%q is blocking %q from spawning", tostring( v ), tostring( ent ) )    
-                return false, v
-            end
+            local model = v:GetModel()
+            if model and #model == 0 then continue end  --  skip non-model entities
+
+            if not v:IsSolid() then continue end  --  skip non-solid entities
+
+            --  prevent spawn
+            vkx_entspawner.debug_print( "%q is blocking %q from spawning", tostring( v ), tostring( ent ) )    
+            return false, v
         end
 
         return true
