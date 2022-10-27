@@ -348,7 +348,7 @@ elseif CLIENT then
         end
 
         --  draw spawners
-        for i, spawner in ipairs( vkx_entspawner.spawners ) do
+        for id, spawner in pairs( vkx_entspawner.spawners ) do
             --  spawners
             for i, v in ipairs( spawner.locations ) do
                 local color = spawner.perma and perma_color or non_perma_color
@@ -382,7 +382,7 @@ elseif CLIENT then
 
         --  spawners
         local tr_pos = LocalPlayer():GetEyeTrace().HitPos
-        for i, spawner in ipairs( vkx_entspawner.spawners ) do
+        for id, spawner in pairs( vkx_entspawner.spawners ) do
             for i, v in ipairs( spawner.locations ) do
                 if tr_pos:DistToSqr( v.pos ) <= min_dist_sqr then
                     local color = spawner.perma and perma_color or non_perma_color
