@@ -38,7 +38,9 @@ Green spawners are non-permanent spawners and red spawners are permanent (saved 
 + `vkx_entspawner_network_run <0 or 1>`: **server**; default to `0`; Should the spawners run-time be networked to allowed users? This option syncs the new spawner properties to clients. Users are defined by `vkx_entspawner_network_superadmin_only` convar
 
 ### ❗ Known Issues
-No issues
+
+#### "I can't spawn ZBASE NPCs"
+You need to check the "Default Spawn Menu" option in ZBASE menu (from the 'Options' tab of the spawnmenu) in order for them to be spawnable.
 
 ### 💡 Contributions
 If you are a developper and you want to help, I'm opened to contributions as long as you respect my **code style**. 
